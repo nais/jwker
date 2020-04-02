@@ -1,0 +1,102 @@
+@startuml component
+
+actor developer as "Developer"
+actor enduser as enduser
+participant cluster as "cluster"
+participant jwker as "jwker"
+participant naiserator as "naiserator"
+participant application as "application"
+participant tokendings as "tokendings"
+database bucket as "bucket"
+database kafka as "kafka"
+participant anotherapplication as "anotherapplication"
+participant idprovider as "idprovider"
+
+==Deploy application==
+developer -> cluster: apply yaml
+cluster <- naiserator: read yaml
+cluster <- naiserator: apply jwker crd
+jwker -> cluster: read jwker crd
+note left:
+jwker -> cluster: create secret
+note left: jwks
+jwker -> kafka: update
+note right: jwks/key-id/accessPolicy json
+naiserator -> application: inject secret
+application -> tokendings: fetch keys from .well-known (if producer)
+
+==Update application policies==
+cluster <- naiserator: read yaml
+naiserator -> bucket: accessPolicy as json
+note right: accessPolicies from all clusters
+tokendings <- bucket: read accessPolicy
+
+==Call another application==
+enduser -> application: fetch resource
+application -> enduser: redirect to id-provider
+enduser -> idprovider: authenticate user
+idprovider -> enduser: user-jwt
+enduser -> application: user-jwt
+application -> tokendings: present client-jwt, signed with jwk
+note right: client-jwt: {sub:app-id(clustername.namespace.appname), audience:tokendings}
+application -> tokendings: client-assertion: client-jwt, subject-token: user-jwt
+tokendings <- bucket: jwks matching sub:app-id in jwt
+tokendings -> tokendings: validate jwt using jwks
+tokendings <- bucket: fetch accessPolicy matching sub:app-id in jwt
+tokendings -> tokendings: evaluate accessPolicies
+tokendings -> idprovider: fetch jwks (public keys)
+tokendings -> tokendings: validate subject:token
+tokendings -> application: return valid token
+application -> anotherapplication: present token
+
+==validate token==
+anotherapplication -> tokendings: fetch public keys
+note right: public keys from tokendings
+anotherapplication -> anotherapplication: validate token from application
+anotherapplication -> application: response
+/'
+==Build and release==
+developer -> cluster: apply yaml
+cluster -> jwkerator: read yaml
+github -> ci: Start build
+ci -> registry: Push image
+
+==NAIS deploy v1==
+ci -> github: Start deployment
+note right: Authenticate with GitHub token
+github -> hookd: Send webhook to NAIS deploy
+
+==NAIS deploy v2==
+ci -> hookd: Start deployment
+note right: Authenticate with team API key
+hookd -> github: Create deployment
+
+==Deploy phase==
+hookd -> deployd: Commission deployment
+hookd -> github: Update deployment status
+note left: queued
+deployd -> kubernetes: Deploy
+kubernetes --> deployd
+deployd -> hookd: Report status
+hookd -> github: Update deployment status
+note left: in_progress
+
+loop until timeout or success
+	deployd -> kubernetes: Check rollout status
+	kubernetes --> deployd
+end
+
+deployd -> hookd: Report status
+hookd -> github: Update deployment status
+note left: success
+
+==Errors==
+hookd -> github: Application failed to start
+note left: failure
+hookd -> github: Error in deployment request
+note left: error
+hookd -> github: Internal error in NAIS deploy
+note left: error
+
+'/
+@enduml

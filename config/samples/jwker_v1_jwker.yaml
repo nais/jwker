@@ -1,0 +1,17 @@
+apiVersion: jwker.nais.io/v1
+kind: Jwker
+metadata:
+  name: jwker-sample
+  namespace: test
+spec:
+  cluster: fincluster
+  accessPolicy:
+    inbound:
+      rules:
+        - application: app-a
+          namespace: anothernamespace
+          cluster: anothercluster
+    outbound:
+      rules:
+        - application: app-b
+

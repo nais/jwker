@@ -1,0 +1,24 @@
+# permissions for end users to edit jwkers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jwker-editor-role
+rules:
+- apiGroups:
+  - jwker.nais.io
+  resources:
+  - jwkers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - jwker.nais.io
+  resources:
+  - jwkers/status
+  verbs:
+  - get

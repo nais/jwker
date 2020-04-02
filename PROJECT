@@ -1,0 +1,7 @@
+domain: nais.io
+repo: nais.io/navikt/jwker
+resources:
+- group: jwker
+  kind: Jwker
+  version: v1
+version: "2"
