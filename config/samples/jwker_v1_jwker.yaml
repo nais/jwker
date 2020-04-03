@@ -4,7 +4,6 @@ metadata:
   name: jwker-sample
   namespace: test
 spec:
-  cluster: fincluster
   accessPolicy:
     inbound:
       rules:
@@ -14,4 +13,6 @@ spec:
     outbound:
       rules:
         - application: app-b
-
+        - application: foo
+          namespace: bar
+          cluster: danser

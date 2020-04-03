@@ -5,7 +5,6 @@ import (
 )
 
 type JwkerSpec struct {
-	Cluster      string        `json:"cluster"`
 	AccessPolicy *AccessPolicy `json:"accessPolicy,omitempty"`
 }
 type AccessPolicy struct {
@@ -21,7 +20,7 @@ type AccessPolicyInbound struct {
 type AccessPolicyRule struct {
 	Application string `json:"application"`
 	Namespace   string `json:"namespace,omitempty"`
-	Cluster     string `json:"clustername,omitempty"`
+	Cluster     string `json:"cluster,omitempty"`
 }
 
 // JwkerStatus defines the observed state of Jwker

@@ -42,7 +42,7 @@ spec:
                         properties:
                           application:
                             type: string
-                          clustername:
+                          cluster:
                             type: string
                           namespace:
                             type: string
@@ -60,7 +60,7 @@ spec:
                         properties:
                           application:
                             type: string
-                          clustername:
+                          cluster:
                             type: string
                           namespace:
                             type: string
@@ -70,10 +70,6 @@ spec:
                       type: array
                   type: object
               type: object
-            cluster:
-              type: string
-          required:
-          - cluster
           type: object
         status:
           description: JwkerStatus defines the observed state of Jwker
