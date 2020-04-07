@@ -1,0 +1,2 @@
+- should be threadsafe
+- how to handle new crd's in cluster if tokendingz is down
