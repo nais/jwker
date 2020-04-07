@@ -1,14 +1,13 @@
 package utils
 
 import (
-	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"encoding/json"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -24,12 +23,12 @@ type TokenDingsToken struct {
 
 var token = TokenDingsToken{}
 
-func GetTokenDingsToken(privateKey *rsa.PrivateKey, jwkerClientID, tokenDingsUrl string) (TokenDingsToken, error) {
+func GetTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) (TokenDingsToken, error) {
 
 	now := time.Now().Unix()
 
-	if token.AccessToken == "" || (token.Created+token.ExpiresIn) < now-10 {
-		if err := fetchTokenDingsToken(privateKey, jwkerClientID, tokenDingsUrl); err != nil {
+	if token.AccessToken == "" || (token.Created+token.ExpiresIn) < now-30 {
+		if err := fetchTokenDingsToken(privateJwk, jwkerClientID, tokenDingsUrl); err != nil {
 			return TokenDingsToken{}, err
 		}
 	}
@@ -37,11 +36,14 @@ func GetTokenDingsToken(privateKey *rsa.PrivateKey, jwkerClientID, tokenDingsUrl
 	return token, nil
 }
 
-func fetchTokenDingsToken(privateKey *rsa.PrivateKey, jwkerClientID, tokenDingsUrl string) error {
+func fetchTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) error {
 
-	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateKey}
+	// Todo: Retries
+
+	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
+	signerOpts.WithHeader("kid", privateJwk.KeyID)
 
 	rsaSigner, err := jose.NewSigner(key, &signerOpts)
 	if err != nil {
@@ -66,6 +68,7 @@ func fetchTokenDingsToken(privateKey *rsa.PrivateKey, jwkerClientID, tokenDingsU
 	if err != nil {
 		return err
 	}
+	fmt.Printf("token to tokendings: %s\n", rawJWT)
 
 	client := http.Client{}
 

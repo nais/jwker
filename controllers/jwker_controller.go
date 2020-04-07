@@ -1,15 +1,18 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 
 	"github.com/go-logr/logr"
 	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 	"k8s.io/apimachinery/pkg/runtime"
 	jwkerv1 "nais.io/navikt/jwker/api/v1"
 	"nais.io/navikt/jwker/storage"
@@ -43,17 +46,68 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	jwkerClientID := fmt.Sprintf("%s:%s:%s", r.ClusterName, "nais", "jwker")
-	tokendingsToken, err := utils.GetTokenDingsToken(r.PrivateKey, jwkerClientID, r.TokenDingsUrl)
+	privateJwk := r.PrivateJwks.Keys[0]
+	tokendingsToken, err := utils.GetTokenDingsToken(&privateJwk, jwkerClientID, r.TokenDingsUrl)
 	if err != nil {
 		r.Log.Error(err, "unable to fetch token from tokendings")
+		return ctrl.Result{}, err
 	}
-	fmt.Println(tokendingsToken)
 
-	// resp, err := http.Post(fmt.Sprintf("%s/%s", r.TokenDingsUrl, "/register"), "application/json", "xxx")
-	// defer resp.Body.Close()
-	// body, _ := ioutil.ReadAll(resp.Body)
+	type ClientRegistration struct {
+		ClientName        string `json:"client_name"`
+		Jwks              string `json:"jwks"`
+		SoftwareStatement string `json:"software_statement"`
+	}
 
-	// fmt.Printf("mah booodeh: %s\n", body)
+	type SoftwareStatement struct {
+		AppId                string   `json:"appId"`
+		AccessPolicyInbound  []string `json:"accessPolicyInbound"`
+		AccessPolicyOutbound []string `json:"accessPolicyOutbound"`
+	}
+	key := jose.SigningKey{Algorithm: jose.RS256, Key: r.PrivateJwks.Keys[0].Key}
+	var signerOpts = jose.SignerOptions{}
+	signerOpts.WithType("JWT")
+	signerOpts.WithHeader("kid", r.PrivateJwks.Keys[0].KeyID)
+
+	rsaSigner, err := jose.NewSigner(key, &signerOpts)
+	if err != nil {
+		r.Log.Error(err, "unable to create signer")
+	}
+	builder := jwt.Signed(rsaSigner)
+
+	claims := SoftwareStatement{
+		AppId:                "xx",
+		AccessPolicyInbound:  []string{"yy"},
+		AccessPolicyOutbound: []string{"zz"},
+	}
+	builder = builder.Claims(claims)
+	rawJWT, err := builder.CompactSerialize()
+	if err != nil {
+		r.Log.Error(err, "unable to build claims")
+	}
+
+	data, err := json.Marshal(ClientRegistration{
+		ClientName:        "xx",
+		Jwks:              "jwks in json-format",
+		SoftwareStatement: rawJWT,
+	})
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/client", r.TokenDingsUrl), bytes.NewReader(data))
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokendingsToken.AccessToken))
+
+	client := http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		r.Log.Error(err, "Unable to fetch token from tokendings")
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+	}
+	bodyString := string(bodyBytes)
+	fmt.Println(bodyString)
+
+	fmt.Printf("Returned token: %#v\n", resp.Body)
 
 	appId := fmt.Sprintf("%s:%s:%s", r.ClusterName, jwker.Namespace, jwker.Name)
 	jwkerStorage, _ := storage.New()
@@ -63,7 +117,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		r.Log.Error(err, "Could not read storage")
 	}
 	if _, ok := appSets[appId]; !ok {
-		//fmt.Println(val)
+		// fmt.Println(val)
 
 	}
 

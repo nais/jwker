@@ -10,7 +10,7 @@ import (
 func GenerateJwkerKeys() (jose.JSONWebKeySet, jose.JSONWebKeySet, *rsa.PrivateKey, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return jose.JSONWebKeySet{}, jose.JSONWebKeySet{}, nil, err
+		return jose.JSONWebKeySet{}, jose.JSONWebKeySet{}, privateKey, err
 	}
 
 	keyId := RandStringBytes(8)
