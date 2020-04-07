@@ -1,0 +1,92 @@
+package utils
+
+import (
+	"crypto/rsa"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"encoding/json"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
+)
+
+type TokenDingsToken struct {
+	AccessToken     string `json:"access_token"`
+	IssuedTokenType string `json:"issued_token_type"`
+	TokenType       string `json:"token_type"`
+	ExpiresIn       int64  `json:"expires_in"`
+	Scope           string `json:"scope"`
+	Created         int64
+}
+
+var token = TokenDingsToken{}
+
+func GetTokenDingsToken(privateKey *rsa.PrivateKey, jwkerClientID, tokenDingsUrl string) (TokenDingsToken, error) {
+
+	now := time.Now().Unix()
+
+	if token.AccessToken == "" || (token.Created+token.ExpiresIn) < now-10 {
+		if err := fetchTokenDingsToken(privateKey, jwkerClientID, tokenDingsUrl); err != nil {
+			return TokenDingsToken{}, err
+		}
+	}
+
+	return token, nil
+}
+
+func fetchTokenDingsToken(privateKey *rsa.PrivateKey, jwkerClientID, tokenDingsUrl string) error {
+
+	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateKey}
+	var signerOpts = jose.SignerOptions{}
+	signerOpts.WithType("JWT")
+
+	rsaSigner, err := jose.NewSigner(key, &signerOpts)
+	if err != nil {
+		return err
+	}
+
+	builder := jwt.Signed(rsaSigner)
+
+	tokenDingsTokenEndpoint := fmt.Sprintf("%s/registration/token", tokenDingsUrl)
+	now := time.Now()
+	claims := jwt.Claims{
+		Issuer:    jwkerClientID,
+		Subject:   jwkerClientID,
+		Audience:  []string{tokenDingsTokenEndpoint},
+		Expiry:    jwt.NewNumericDate(now.Add(time.Second * 500)),
+		NotBefore: jwt.NewNumericDate(now),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ID:        RandStringBytes(8),
+	}
+	builder = builder.Claims(claims)
+	rawJWT, err := builder.CompactSerialize()
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{}
+
+	data := url.Values{
+		"scope":                 []string{fmt.Sprintf("%s/registration/client", tokenDingsUrl)},
+		"grant_type":            []string{"client_credentials"},
+		"client_assertion_type": []string{"urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+		"client_assertion":      []string{rawJWT},
+	}.Encode()
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/token", tokenDingsUrl), strings.NewReader(data))
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if json.NewDecoder(resp.Body).Decode(&token); err != nil {
+		return err
+	}
+	token.Created = time.Now().Unix()
+	return nil
+}

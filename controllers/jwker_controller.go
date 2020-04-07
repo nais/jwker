@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 
-	"encoding/json"
 	"github.com/go-logr/logr"
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,28 +21,40 @@ import (
 // JwkerReconciler reconciles a Jwker object
 type JwkerReconciler struct {
 	client.Client
-	Log         logr.Logger
-	Scheme      *runtime.Scheme
-	ClusterName string
-	StoragePath string
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	ClusterName   string
+	StoragePath   string
+	PrivateJwks   *jose.JSONWebKeySet
+	PrivateKey    *rsa.PrivateKey
+	TokenDingsUrl string
 }
 
 // +kubebuilder:rbac:groups=jwker.nais.io,resources=jwkers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=jwker.nais.io,resources=jwkers/status,verbs=get;update;patch
 
-func init() {
-
-}
-
 func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var jwker jwkerv1.Jwker
 	ctx := context.Background()
 	_ = r.Log.WithValues("jwker", req.NamespacedName)
-
 	if err := r.Get(ctx, req.NamespacedName, &jwker); err != nil {
-		r.Log.Error(err, "Unable to fetch jwkr")
+		r.Log.Info(fmt.Sprintf("This is when we clean up app: %s in namespace: %s", req.Name, req.Namespace))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	jwkerClientID := fmt.Sprintf("%s:%s:%s", r.ClusterName, "nais", "jwker")
+	tokendingsToken, err := utils.GetTokenDingsToken(r.PrivateKey, jwkerClientID, r.TokenDingsUrl)
+	if err != nil {
+		r.Log.Error(err, "unable to fetch token from tokendings")
+	}
+	fmt.Println(tokendingsToken)
+
+	// resp, err := http.Post(fmt.Sprintf("%s/%s", r.TokenDingsUrl, "/register"), "application/json", "xxx")
+	// defer resp.Body.Close()
+	// body, _ := ioutil.ReadAll(resp.Body)
+
+	// fmt.Printf("mah booodeh: %s\n", body)
+
 	appId := fmt.Sprintf("%s:%s:%s", r.ClusterName, jwker.Namespace, jwker.Name)
 	jwkerStorage, _ := storage.New()
 	appSets, err := jwkerStorage.ReadJwkerStorage(r.StoragePath)
@@ -50,9 +62,8 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if err != nil {
 		r.Log.Error(err, "Could not read storage")
 	}
-	if val, ok := appSets[appId]; !ok {
-		fmt.Println("Not found")
-		fmt.Println(val)
+	if _, ok := appSets[appId]; !ok {
+		//fmt.Println(val)
 
 	}
 

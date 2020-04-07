@@ -1,0 +1,24 @@
+@startuml component
+
+actor aura as "Responsible Nais developer"
+participant tokendings as "Tokendings"
+database tokendingsstore as "tokendingsStore"
+participant jwker as "Jwker"
+database jwkerStore as "jwkerStore"
+
+==Register with tokendings==
+aura -> tokendings: register jwks uri for jwker
+jwker -> jwker: create key pair
+jwker -> jwker: create client assertion signed with private key
+note left:jwt in body param called client_assertion
+jwker -> tokendings: authenticate using client_credentials auth flow
+tokendings -> tokendings: validate client_assertion using public key from jwks uri
+tokendings -> jwker: please have a nice token
+jwker -> tokendings: call client registration endpoint
+tokendings -> tokendingsstore: store client registration
+note left: content: application jwks and accessPolicy
+jwker -> jwkerStore: store application
+note left: content: application jwks (with private key) and accessPolicy
+
+@enduml
+
