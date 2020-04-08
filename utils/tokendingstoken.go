@@ -23,12 +23,12 @@ type TokenDingsToken struct {
 
 var token = TokenDingsToken{}
 
-func GetTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) (TokenDingsToken, error) {
+func GetTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID AppId, tokenDingsUrl string) (TokenDingsToken, error) {
 
 	now := time.Now().Unix()
 
 	if token.AccessToken == "" || (token.Created+token.ExpiresIn) < now-30 {
-		if err := fetchTokenDingsToken(privateJwk, jwkerClientID, tokenDingsUrl); err != nil {
+		if err := fetchTokenDingsToken(privateJwk, jwkerClientID.String(), tokenDingsUrl); err != nil {
 			return TokenDingsToken{}, err
 		}
 	}

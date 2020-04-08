@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/go-chi/chi v4.1.0+incompatible
 	github.com/go-logr/logr v0.1.0
+	github.com/google/uuid v1.1.1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	gopkg.in/square/go-jose.v2 v2.2.2

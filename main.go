@@ -62,7 +62,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	privateJwks, publicJwks, privateKey, err := utils.GenerateJwkerKeys()
+	privateJwks, publicJwks, err := utils.GenerateJwkerKeys()
 	if err != nil {
 		setupLog.Error(err, "Unable to generate jwks")
 	}
@@ -74,7 +74,6 @@ func main() {
 		ClusterName:   clusterName,
 		StoragePath:   storagePath,
 		PrivateJwks:   &privateJwks,
-		PrivateKey:    privateKey,
 		TokenDingsUrl: tokenDingsUrl,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
