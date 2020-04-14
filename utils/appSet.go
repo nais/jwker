@@ -10,6 +10,7 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 	v1 "nais.io/navikt/jwker/api/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type AppId struct {
@@ -41,7 +42,6 @@ type SoftwareStatement struct {
 }
 
 func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId AppId, j *v1.Jwker) (ClientRegistrationResponse, error) {
-
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: jwkerPrivateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -58,7 +58,6 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 
 		return ClientRegistrationResponse{}, err
 	}
-	fmt.Printf("SoftwareStatement: %#v\n", softwareStatement)
 	builder = builder.Claims(softwareStatement)
 
 	rawJWT, err := builder.CompactSerialize()
@@ -71,7 +70,9 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 		Jwks:              *clientPublicJwks,
 		SoftwareStatement: rawJWT,
 	})
-	fmt.Printf("jwks: %s\n", data)
+	if err != nil {
+		ctrl.Log.Error(err, "Unable to marshal data")
+	}
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/client", tokenDingsUrl), bytes.NewReader(data))
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))

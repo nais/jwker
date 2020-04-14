@@ -68,13 +68,13 @@ func main() {
 	}
 
 	if err = (&controllers.JwkerReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Scheme:        mgr.GetScheme(),
-		ClusterName:   clusterName,
-		StoragePath:   storagePath,
-		PrivateJwks:   &privateJwks,
-		TokenDingsUrl: tokenDingsUrl,
+		Client:           mgr.GetClient(),
+		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Scheme:           mgr.GetScheme(),
+		ClusterName:      clusterName,
+		StoragePath:      storagePath,
+		JwkerPrivateJwks: &privateJwks,
+		TokenDingsUrl:    tokenDingsUrl,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
