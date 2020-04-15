@@ -4,7 +4,7 @@ metadata:
   name: jwker-sample
   namespace: test
 spec:
-  secretName: jwker-samle-random
+  secretName: jwker-sample-1234
   accessPolicy:
     inbound:
       rules:

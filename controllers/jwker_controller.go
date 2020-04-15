@@ -59,11 +59,11 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	secret, err := secretscreator.CreateSecret(req.Name, req.Namespace, clientPrivateJwks)
+	secret, err := secretscreator.CreateSecret(j.Spec.SecretName, req.Namespace, clientPrivateJwks)
 	if err != nil {
 		r.Log.Error(err, "Unable to create secret object")
 	}
-	if err := r.createOrUpdateSecret(req, ctx, secret); err != nil {
+	if err := r.createOrUpdateSecret(ctx, secret); err != nil {
 		r.Log.Error(err, "Unable to create or update secret")
 	}
 
@@ -76,9 +76,13 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *JwkerReconciler) createOrUpdateSecret(req ctrl.Request, ctx context.Context, secret v1.Secret) error {
-	if err := r.Client.Get(ctx, req.NamespacedName, secret.DeepCopyObject()); err != nil {
-		r.Log.Info(fmt.Sprintf("Creating new secret: %s in namespace %s", req.Name, req.Namespace))
+func (r *JwkerReconciler) createOrUpdateSecret(ctx context.Context, secret v1.Secret) error {
+	objectKey := client.ObjectKey{
+		Namespace: secret.Namespace,
+		Name:      secret.Name,
+	}
+
+	if err := r.Client.Get(ctx, objectKey, secret.DeepCopyObject()); err != nil {
 		if err := r.Client.Create(ctx, secret.DeepCopyObject()); err != nil {
 			return err
 		}

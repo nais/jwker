@@ -2,6 +2,7 @@ package secretscreator
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"gopkg.in/square/go-jose.v2"
 	v1 "k8s.io/api/core/v1"
@@ -9,6 +10,7 @@ import (
 )
 
 func CreateSecret(name, namespace string, clientPrivateJwks jose.JSONWebKeySet) (v1.Secret, error) {
+	fmt.Printf("secretName: %s\n", name)
 	clientPrivateJwksJson, err := json.MarshalIndent(clientPrivateJwks, "", " ")
 	if err != nil {
 		return v1.Secret{}, err
