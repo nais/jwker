@@ -4,6 +4,7 @@ metadata:
   name: jwker-sample
   namespace: test
 spec:
+  secretName: jwker-samle-random
   accessPolicy:
     inbound:
       rules:
@@ -12,7 +13,6 @@ spec:
           cluster: anothercluster
     outbound:
       rules:
-        - application: app-b
         - application: foo
           namespace: bar
           cluster: danser

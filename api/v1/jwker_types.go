@@ -5,7 +5,8 @@ import (
 )
 
 type JwkerSpec struct {
-	AccessPolicy *AccessPolicy `json:"accessPolicy,omitempty"`
+	AccessPolicy *AccessPolicy `json:"accessPolicy"`
+	SecretName   string        `json:"secretName"`
 }
 type AccessPolicy struct {
 	Inbound  *AccessPolicyInbound  `json:"inbound,omitempty"`
@@ -15,7 +16,7 @@ type AccessPolicyOutbound struct {
 	Rules []AccessPolicyRule `json:"rules,omitempty"`
 }
 type AccessPolicyInbound struct {
-	Rules []AccessPolicyRule `json:"rules"`
+	Rules []AccessPolicyRule `json:"rules,omitempty"`
 }
 type AccessPolicyRule struct {
 	Application string `json:"application"`

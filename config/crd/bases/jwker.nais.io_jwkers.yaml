@@ -50,8 +50,6 @@ spec:
                         - application
                         type: object
                       type: array
-                  required:
-                  - rules
                   type: object
                 outbound:
                   properties:
@@ -70,6 +68,11 @@ spec:
                       type: array
                   type: object
               type: object
+            secretName:
+              type: string
+          required:
+          - accessPolicy
+          - secretName
           type: object
         status:
           description: JwkerStatus defines the observed state of Jwker

@@ -2,17 +2,14 @@ package controllers
 
 import (
 	"context"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 
 	"github.com/go-logr/logr"
 	"gopkg.in/square/go-jose.v2"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	jwkerv1 "nais.io/navikt/jwker/api/v1"
+	"nais.io/navikt/jwker/secretscreator"
 	"nais.io/navikt/jwker/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,35 +59,34 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	clientPrivateKey := clientPrivateJwks.Keys[0].Key.(*rsa.PrivateKey)
-	pemdata := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(clientPrivateKey),
-		},
-	)
-	fmt.Printf("Key: %s\n", pemdata)
-
-	clientRegistrationResponse, err := utils.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
-	stringdata := map[string]string{"balls": "deep"}
-
-	secret := v1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "testsecret",
-			Namespace: "test",
-		},
-		StringData: stringdata,
-		Type:       "Opaque",
+	secret, err := secretscreator.CreateSecret(req.Name, req.Namespace, clientPrivateJwks)
+	if err != nil {
+		r.Log.Error(err, "Unable to create secret object")
+	}
+	if err := r.createOrUpdateSecret(req, ctx, secret); err != nil {
+		r.Log.Error(err, "Unable to create or update secret")
 	}
 
-	r.Client.Create(ctx, secret.DeepCopyObject())
+	clientRegistrationResponse, err := utils.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
+	if err != nil {
+		r.Log.Error(err, "Unable to register client")
+	}
 
 	fmt.Printf("clientresponse: %#v", clientRegistrationResponse)
 	return ctrl.Result{}, nil
+}
+
+func (r *JwkerReconciler) createOrUpdateSecret(req ctrl.Request, ctx context.Context, secret v1.Secret) error {
+	if err := r.Client.Get(ctx, req.NamespacedName, secret.DeepCopyObject()); err != nil {
+		r.Log.Info(fmt.Sprintf("Creating new secret: %s in namespace %s", req.Name, req.Namespace))
+		if err := r.Client.Create(ctx, secret.DeepCopyObject()); err != nil {
+			return err
+		}
+	}
+	if err := r.Client.Update(ctx, secret.DeepCopyObject()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
