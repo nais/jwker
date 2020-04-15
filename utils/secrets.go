@@ -1,4 +1,4 @@
-package secretscreator
+package utils
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateSecret(appName, name, namespace string, clientPrivateJwks jose.JSONWebKeySet) (v1.Secret, error) {
+func CreateSecretSpec(appName, name, namespace string, clientPrivateJwks jose.JSONWebKeySet) (v1.Secret, error) {
 	clientPrivateJwksJson, err := json.MarshalIndent(clientPrivateJwks, "", " ")
 	if err != nil {
 		return v1.Secret{}, err

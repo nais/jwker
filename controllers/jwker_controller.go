@@ -7,10 +7,8 @@ import (
 	"github.com/go-logr/logr"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	jwkerv1 "nais.io/navikt/jwker/api/v1"
-	"nais.io/navikt/jwker/secretscreator"
 	"nais.io/navikt/jwker/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +34,9 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = r.Log.WithValues("jwker", req.NamespacedName)
 	if err := r.Get(ctx, req.NamespacedName, &j); err != nil {
 		r.Log.Info(fmt.Sprintf("This is when we clean up app: %s in namespace: %s", req.Name, req.Namespace))
+
+		
+
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	jwkerClientID := utils.AppId{Name: "jwker", Namespace: "nais", Cluster: r.ClusterName}
@@ -59,29 +60,13 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		r.Log.Error(err, "Unable to generate client JWKS")
 		return ctrl.Result{}, err
 	}
-	secrets, err := r.retrieveJwkerSecrets(req.Name, req.Namespace)
-	if err != nil {
-		r.Log.Error(err, "Unable to retrieve secrets from cluster")
-	}
-	for _, secret := range secrets.Items {
-		if secret.Name != j.Spec.SecretName {
-			r.Log.Info(fmt.Sprintf("Deleting secret %s in %s", secret.Name, secret.Namespace))
-			r.Client.Delete(ctx, secret.DeepCopyObject())
-		}
+
+	if err := r.reconcileSecrets(req, ctx, j.Spec.SecretName, clientPrivateJwks); err != nil {
+		r.Log.Error(err, "Reconciling secrets failed...")
+		return ctrl.Result{}, err
 	}
 
-	secretSpec, err := secretscreator.CreateSecret(req.Name, j.Spec.SecretName, req.Namespace, clientPrivateJwks)
-	if err != nil {
-		r.Log.Error(err, "Unable to create secretSpec object")
-	}
-	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: j.Namespace, Name: j.Spec.SecretName}, secretSpec.DeepCopyObject()); err != nil {
-		r.Log.Info(fmt.Sprintf("Creating secret %s in %s", secretSpec.Name, secretSpec.Namespace))
-		if err := r.applySecret(ctx, secretSpec); err != nil {
-			r.Log.Error(err, "Unable to create or update secretSpec")
-		}
-		r.Log.Info(fmt.Sprintf("Registering app %s:%s:%s with token-dingz", appClientId.Cluster, appClientId.Namespace, appClientId.Name))
-	}
-
+	r.Log.Info(fmt.Sprintf("Registering app %s:%s:%s with token-dingz", appClientId.Cluster, appClientId.Namespace, appClientId.Name))
 	clientRegistrationResponse, err := utils.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
 	if err != nil {
 		r.Log.Error(err, "Unable to register client")
@@ -92,7 +77,40 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-func (r *JwkerReconciler) retrieveJwkerSecrets(app, namespace string) (corev1.SecretList, error) {
+func (r *JwkerReconciler) reconcileSecrets(req ctrl.Request, ctx context.Context, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
+	clusterSecrets, err := r.fetchClusterSecrets(req.Name, req.Namespace)
+	if err != nil {
+		return fmt.Errorf("Unable to fetch clusterSecrets from cluster: %s", err.Error())
+	}
+
+	for _, clusterSecret := range clusterSecrets.Items {
+		if clusterSecret.Name != secretName {
+			r.Log.Info(fmt.Sprintf("Deleting clusterSecret %s in %s", clusterSecret.Name, clusterSecret.Namespace))
+			if err := r.Client.Delete(ctx, clusterSecret.DeepCopyObject()); err != nil {
+				return fmt.Errorf("Unable to delete clusterSecret: %s", err.Error())
+			}
+		}
+	}
+
+	secretSpec, err := utils.CreateSecretSpec(req.Name, secretName, req.Namespace, clientPrivateJwks)
+	if err != nil {
+		return fmt.Errorf("Unable to create secretSpec object: %s", err.Error())
+	}
+
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: req.Namespace, Name: secretName}, secretSpec.DeepCopyObject()); err != nil {
+		if err.Error() != fmt.Sprintf("Secret \"%s\" not found", secretName) {
+			return fmt.Errorf("Unable to create secret: %s", err.Error())
+		}
+		r.Log.Info(fmt.Sprintf("Creating clusterSecret %s in %s", secretSpec.Name, secretSpec.Namespace))
+		if err := r.Client.Create(ctx, secretSpec.DeepCopyObject()); err != nil {
+			return fmt.Errorf("Unable to apply secretSpec: %s", err.Error())
+		}
+	}
+
+	return nil
+}
+
+func (r *JwkerReconciler) fetchClusterSecrets(app, namespace string) (corev1.SecretList, error) {
 	var secrets corev1.SecretList
 	var mLabels = client.MatchingLabels{}
 
@@ -102,13 +120,6 @@ func (r *JwkerReconciler) retrieveJwkerSecrets(app, namespace string) (corev1.Se
 		return secrets, err
 	}
 	return secrets, nil
-}
-
-func (r *JwkerReconciler) applySecret(ctx context.Context, secret v1.Secret) error {
-	if err := r.Client.Create(ctx, secret.DeepCopyObject()); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
