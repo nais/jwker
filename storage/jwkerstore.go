@@ -4,42 +4,52 @@ import (
 	"context"
 
 	"cloud.google.com/go/storage"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"google.golang.org/api/option"
 )
 
 var (
-	storageLog              = ctrl.Log.WithName("storage")
-	_          JwkerStorage = &jwkerStorage{}
+	_ JwkerStorage = &jwkerStorage{}
 )
 
 type JwkerStorage interface {
-	//Read(string) (map[string]JwkerAppSet, error)
-	Write(bucketObjectName string, data []byte) error
+	// Read(string) (map[string]JwkerAppSet, error)
+	Write(fileName string, data []byte) error
+	Delete(fileName string) error
 }
 
-type jwkerStorage struct{
-	bucketName string
+type jwkerStorage struct {
+	credentialsPath string
+	bucketName      string
+	client          *storage.Client
 }
 
-func New(bucketName string) (JwkerStorage, error) {
-	return &jwkerStorage{bucketName: bucketName}, nil
+func New(credentialsPath, bucketName string) (JwkerStorage, error) {
+	client, err := storage.NewClient(context.Background(), option.WithCredentialsFile(credentialsPath))
+	if err != nil {
+		return nil, err
+	}
+	return &jwkerStorage{
+		credentialsPath: credentialsPath,
+		bucketName:      bucketName,
+		client:          client,
+	}, nil
+}
+
+func (j *jwkerStorage) Delete(bucketObjectName string) error {
+	if err := j.client.Bucket(j.bucketName).Object(bucketObjectName).Delete(context.Background()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (j *jwkerStorage) Write(bucketObjectName string, data []byte) error {
-	client, err := storage.NewClient(context.Background())
-	if err != nil {
-		storageLog.Error(err, "error creating storage client")
-	}
-
-	writer := client.Bucket(j.bucketName).Object(bucketObjectName).NewWriter(context.Background())
-	_, err = writer.Write(data)
+	writer := j.client.Bucket(j.bucketName).Object(bucketObjectName).NewWriter(context.Background())
+	_, err := writer.Write(data)
 
 	if err != nil {
-		storageLog.Error(err, "unable to write to bucket")
 		return err
 	}
 	if err := writer.Close(); err != nil {
-		storageLog.Error(err, "unable to close bucket writer")
 		return err
 	}
 	return nil
@@ -75,4 +85,4 @@ func (j *jwkerStorage) ReadJwkerStorage(storagePath string) (map[string]JwkerApp
 	}
 	return storage, err
 }
-	*/
+*/

@@ -24,6 +24,10 @@ func (a *AppId) String() string {
 	return fmt.Sprintf("%s:%s:%s", a.Cluster, a.Namespace, a.Name)
 }
 
+func (a *AppId) ToFileName() string {
+	return fmt.Sprintf("%s/%s/%s", a.Cluster, a.Namespace, a.Name)
+}
+
 type ClientRegistration struct {
 	ClientName        string             `json:"client_name"`
 	Jwks              jose.JSONWebKeySet `json:"jwks"`

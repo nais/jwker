@@ -40,6 +40,7 @@ func main() {
 	var storagePath string
 	var tokenDingsUrl string
 	var storageBucket string
+	var credentialsPath string
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
@@ -49,6 +50,7 @@ func main() {
 	flag.StringVar(&storagePath, "storagepath", "storage.json", "path to storage object")
 	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", "http://localhost:8080", "URL to tokendings")
 	flag.StringVar(&storageBucket, "storageBucket", "jwker-dev", "Bucket name")
+	flag.StringVar(&credentialsPath, "credentialsPath", "./sa-credentials.json", "path to sa-credentials.json")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -69,7 +71,7 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "Unable to generate jwks")
 	}
-	jwkerStorage, err := storage.New(storageBucket)
+	jwkerStorage, err := storage.New(credentialsPath, storageBucket)
 	if err != nil {
 		setupLog.Error(err, "Unable to instantiate jwkerStorage")
 	}

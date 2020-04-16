@@ -65,6 +65,10 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, err
 		}
 
+		if err := r.JwkerStorage.Delete(tmpAppClientId.ToFileName()); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -93,8 +97,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		r.logger.Error(err, "Unable to register client")
 	}
 
-	fmt.Printf("clientresponse: %#v\n", clientRegistrationResponse)
-	if err := r.JwkerStorage.Write("spragleknas", clientRegistrationResponse); err != nil {
+	if err := r.JwkerStorage.Write(appClientId.ToFileName(), clientRegistrationResponse); err != nil {
 		return ctrl.Result{}, err
 	}
 

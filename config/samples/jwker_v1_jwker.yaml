@@ -2,7 +2,7 @@ apiVersion: jwker.nais.io/v1
 kind: Jwker
 metadata:
   name: jwker-sample
-  namespace: test
+  namespace: default
 spec:
   secretName: jwker-sample-1234
   accessPolicy:
