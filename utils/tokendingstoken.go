@@ -68,7 +68,7 @@ func fetchTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDings
 	if err != nil {
 		return err
 	}
-	fmt.Printf("token to tokendings: %s\n", rawJWT)
+	//fmt.Printf("token to tokendings: %s\n", rawJWT)
 
 	client := http.Client{}
 

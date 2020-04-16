@@ -1,12 +1,9 @@
 package storage
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
+	"context"
 
-	"gopkg.in/square/go-jose.v2"
+	"cloud.google.com/go/storage"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -16,26 +13,39 @@ var (
 )
 
 type JwkerStorage interface {
-	ReadJwkerStorage(string) (map[string]JwkerAppSet, error)
+	//Read(string) (map[string]JwkerAppSet, error)
+	Write(bucketObjectName string, data []byte) error
 }
 
-type jwkerStorage struct{}
-
-type JwkerAppSet struct {
-	Appid        string             `json:"appId"`
-	Jwks         jose.JSONWebKeySet `json:"jwks"`
-	AccessPolicy AccessPolicy       `json:"accessPolicy"`
+type jwkerStorage struct{
+	bucketName string
 }
 
-type AccessPolicy struct {
-	Inbound  []string `json:"inbound"`
-	Outbound []string `json:"outbound"`
+func New(bucketName string) (JwkerStorage, error) {
+	return &jwkerStorage{bucketName: bucketName}, nil
 }
 
-func New() (JwkerStorage, error) {
-	return &jwkerStorage{}, nil
+func (j *jwkerStorage) Write(bucketObjectName string, data []byte) error {
+	client, err := storage.NewClient(context.Background())
+	if err != nil {
+		storageLog.Error(err, "error creating storage client")
+	}
+
+	writer := client.Bucket(j.bucketName).Object(bucketObjectName).NewWriter(context.Background())
+	_, err = writer.Write(data)
+
+	if err != nil {
+		storageLog.Error(err, "unable to write to bucket")
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		storageLog.Error(err, "unable to close bucket writer")
+		return err
+	}
+	return nil
 }
 
+/*
 func (j *jwkerStorage) ReadJwkerStorage(storagePath string) (map[string]JwkerAppSet, error) {
 	var storage map[string]JwkerAppSet
 
@@ -63,6 +73,6 @@ func (j *jwkerStorage) ReadJwkerStorage(storagePath string) (map[string]JwkerApp
 			return nil, fmt.Errorf("No output id access policies. AppId: [%s]", k)
 		}
 	}
-
 	return storage, err
 }
+	*/

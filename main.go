@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"nais.io/navikt/jwker/storage"
 	"nais.io/navikt/jwker/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -38,6 +39,7 @@ func main() {
 	var clusterName string
 	var storagePath string
 	var tokenDingsUrl string
+	var storageBucket string
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
@@ -46,6 +48,7 @@ func main() {
 	flag.StringVar(&clusterName, "clustername", "cluster_name_not_set", "Name of runtime cluster")
 	flag.StringVar(&storagePath, "storagepath", "storage.json", "path to storage object")
 	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", "http://localhost:8080", "URL to tokendings")
+	flag.StringVar(&storageBucket, "storageBucket", "jwker-dev", "Bucket name")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -66,7 +69,10 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "Unable to generate jwks")
 	}
-
+	jwkerStorage, err := storage.New(storageBucket)
+	if err != nil {
+		setupLog.Error(err, "Unable to instantiate jwkerStorage")
+	}
 	if err = (&controllers.JwkerReconciler{
 		Client:           mgr.GetClient(),
 		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
@@ -75,6 +81,7 @@ func main() {
 		StoragePath:      storagePath,
 		JwkerPrivateJwks: &privateJwks,
 		TokenDingsUrl:    tokenDingsUrl,
+		JwkerStorage:     jwkerStorage,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
