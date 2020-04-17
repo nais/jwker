@@ -26,8 +26,9 @@ type AccessPolicyRule struct {
 
 // JwkerStatus defines the observed state of Jwker
 type JwkerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	SynchronizationTime  int64  `json:"synchronizationTime,omitempty"`
+	SynchronizationState string `json:"synchronizationState,omitempty"`
+	SynchronizationHash  string `json:"synchronizationHash,omitempty"`
 }
 
 // +kubebuilder:object:root=true

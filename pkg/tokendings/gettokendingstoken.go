@@ -1,4 +1,4 @@
-package utils
+package tokendings
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nais/jwker/utils"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -23,20 +24,20 @@ type TokenDingsToken struct {
 
 var token = TokenDingsToken{}
 
-func GetTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID AppId, tokenDingsUrl string) (TokenDingsToken, error) {
+func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID AppId, tokenDingsUrl string) (*TokenDingsToken, error) {
 
 	now := time.Now().Unix()
 
 	if token.AccessToken == "" || (token.Created+token.ExpiresIn) < now-30 {
-		if err := fetchTokenDingsToken(privateJwk, jwkerClientID.String(), tokenDingsUrl); err != nil {
-			return TokenDingsToken{}, err
+		if err := fetchNewToken(privateJwk, jwkerClientID.String(), tokenDingsUrl); err != nil {
+			return &TokenDingsToken{}, err
 		}
 	}
 
-	return token, nil
+	return &token, nil
 }
 
-func fetchTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) error {
+func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) error {
 
 	// Todo: Retries
 
@@ -61,7 +62,7 @@ func fetchTokenDingsToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDings
 		Expiry:    jwt.NewNumericDate(now.Add(time.Second * 500)),
 		NotBefore: jwt.NewNumericDate(now),
 		IssuedAt:  jwt.NewNumericDate(now),
-		ID:        RandStringBytes(8),
+		ID:        utils.RandStringBytes(8),
 	}
 	builder = builder.Claims(claims)
 	rawJWT, err := builder.CompactSerialize()

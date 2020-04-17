@@ -2,9 +2,13 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 
 	"cloud.google.com/go/storage"
+	"github.com/nais/jwker/pkg/tokendings"
 	"google.golang.org/api/option"
+	"gopkg.in/square/go-jose.v2"
 )
 
 var (
@@ -15,6 +19,7 @@ type JwkerStorage interface {
 	// Read(string) (map[string]JwkerAppSet, error)
 	Write(fileName string, data []byte) error
 	Delete(fileName string) error
+	Read(fileName string) (jose.JSONWebKeySet, error)
 }
 
 type jwkerStorage struct {
@@ -35,6 +40,24 @@ func New(credentialsPath, bucketName string) (JwkerStorage, error) {
 	}, nil
 }
 
+func (j *jwkerStorage) Read(bucketObjectName string) (jose.JSONWebKeySet, error) {
+	reader, err := j.client.Bucket(j.bucketName).Object(bucketObjectName).NewReader(context.Background())
+	if err != nil {
+		return jose.JSONWebKeySet{}, err
+	}
+	defer reader.Close()
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return jose.JSONWebKeySet{}, err
+	}
+	var clientResponse tokendings.ClientRegistrationResponse
+
+	if err := json.Unmarshal(data, &clientResponse); err != nil {
+		return jose.JSONWebKeySet{}, err
+	}
+	return clientResponse.Jwks, nil
+
+}
 func (j *jwkerStorage) Delete(bucketObjectName string) error {
 	if err := j.client.Bucket(j.bucketName).Object(bucketObjectName).Delete(context.Background()); err != nil {
 		return err
@@ -54,35 +77,3 @@ func (j *jwkerStorage) Write(bucketObjectName string, data []byte) error {
 	}
 	return nil
 }
-
-/*
-func (j *jwkerStorage) ReadJwkerStorage(storagePath string) (map[string]JwkerAppSet, error) {
-	var storage map[string]JwkerAppSet
-
-	file, err := ioutil.ReadFile(storagePath)
-	if err != nil {
-		storageLog.Error(err, "Unable to read storage")
-		os.Exit(1)
-	}
-	if err := json.Unmarshal([]byte(file), &storage); err != nil {
-		storageLog.Error(err, "Unable to unmarshal storage")
-		os.Exit(1)
-	}
-
-	for k, v := range storage {
-		if v.Appid == "" {
-			return nil, fmt.Errorf("Empty app id.")
-		}
-		if len(v.Jwks.Keys) < 1 {
-			return nil, fmt.Errorf("No keys present. AppId: [%s]", k)
-		}
-		if len(v.AccessPolicy.Inbound) < 1 {
-			return nil, fmt.Errorf("No inbound access policies. AppId: [%s]", k)
-		}
-		if len(v.AccessPolicy.Outbound) < 1 {
-			return nil, fmt.Errorf("No output id access policies. AppId: [%s]", k)
-		}
-	}
-	return storage, err
-}
-*/

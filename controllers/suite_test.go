@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	jwkerv1 "nais.io/navikt/jwker/api/v1"
+	jwkerv1 "github.com/nais/jwker/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 

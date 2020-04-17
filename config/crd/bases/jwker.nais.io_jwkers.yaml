@@ -76,6 +76,14 @@ spec:
           type: object
         status:
           description: JwkerStatus defines the observed state of Jwker
+          properties:
+            synchronizationHash:
+              type: string
+            synchronizationState:
+              type: string
+            synchronizationTime:
+              format: int64
+              type: integer
           type: object
       type: object
   version: v1

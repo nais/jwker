@@ -1,4 +1,4 @@
-package utils
+package tokendings
 
 import (
 	"bytes"
@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/url"
 
+	v1 "github.com/nais/jwker/api/v1"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
-	v1 "nais.io/navikt/jwker/api/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -46,14 +46,12 @@ type SoftwareStatement struct {
 	AccessPolicyOutbound []string `json:"accessPolicyOutbound"`
 }
 
-// TODO: We need to handle response from token-dingz once endpoint is ready
 func DeleteClient(accessToken string, tokenDingsUrl string, appClientId AppId) error {
 	fmt.Printf("%s/registration/client/%s\n", tokenDingsUrl, url.QueryEscape(appClientId.String()))
 	request, err := http.NewRequest("DELETE", fmt.Sprintf("%s/registration/client/%s", tokenDingsUrl, url.QueryEscape(appClientId.String())), nil)
 	if err != nil {
 		return err
 	}
-	//request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	client := http.Client{}
 	resp, err := client.Do(request)
@@ -62,12 +60,11 @@ func DeleteClient(accessToken string, tokenDingsUrl string, appClientId AppId) e
 	}
 
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	fmt.Println(bodyBytes)
-	if err != nil {
-		return err
+	if resp.StatusCode != http.StatusNoContent {
+		return nil
 	}
-	return nil
+
+	return fmt.Errorf("Something went wrong when deleting client from tokendings")
 }
 
 func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId AppId, j *v1.Jwker) ([]byte, error) {
@@ -116,32 +113,43 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("Unable to register application with tokendings. StatusCode: %d", resp.StatusCode)
+	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	//var clientRegistrationResponse ClientRegistrationResponse
 	return bodyBytes, nil
+}
 
-	/*	appId := fmt.Sprintf("%s:%s:%s", r.ClusterName, jwker.Namespace, jwker.Name)
-		jwkerStorage, _ := storage.New()
-		appSets, err := jwkerStorage.ReadJwkerStorage(r.StoragePath)
+func createSoftwareStatement(jwker *v1.Jwker, appId AppId) (SoftwareStatement, error) {
+	var inbound []string
+	var outbound []string
+	for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
+		cluster, namespace := parseAccessPolicy(rule, appId)
+		inbound = append(inbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+	}
+	for _, rule := range jwker.Spec.AccessPolicy.Outbound.Rules {
+		cluster, namespace := parseAccessPolicy(rule, appId)
+		outbound = append(outbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+	}
+	return SoftwareStatement{
+		AppId:                appId.String(),
+		AccessPolicyInbound:  inbound,
+		AccessPolicyOutbound: outbound,
+	}, nil
+}
 
-		if err != nil {
-			r.Log.Error(err, "Could not read storage")
-		}
-		if _, ok := appSets[appId]; !ok {
-			// fmt.Println(val)
-
-		}
-
-		appkeyset := generateNewAppSet(r, jwker)
-		appjson, err := json.MarshalIndent(appkeyset, "", " ")
-		if err != nil {
-			r.Log.Error(err, "unable to marshall object")
-		}
-
-		_ = ioutil.WriteFile("test.json", appjson, 0644)
-	*/
+func parseAccessPolicy(rule v1.AccessPolicyRule, appId AppId) (string, string) {
+	cluster := rule.Cluster
+	namespace := rule.Namespace
+	if cluster == "" {
+		cluster = appId.Cluster
+	}
+	if namespace == "" {
+		namespace = appId.Namespace
+	}
+	return cluster, namespace
 }
