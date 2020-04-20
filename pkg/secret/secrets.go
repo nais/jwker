@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func CreateSecretSpec(app tokendings.AppId, secretName string, clientPrivateJwks jose.JSONWebKeySet) (corev1.Secret, error) {
+func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) (corev1.Secret, error) {
 	clientPrivateJwksJson, err := json.MarshalIndent(clientPrivateJwks, "", " ")
 	if err != nil {
 		return corev1.Secret{}, err
@@ -35,7 +35,7 @@ func CreateSecretSpec(app tokendings.AppId, secretName string, clientPrivateJwks
 	}, nil
 }
 
-func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.AppId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
+func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
 	if err := DeleteClusterSecrets(cli, ctx, app, secretName); err != nil {
 		return fmt.Errorf("Unable to delete clusterSecrets from cluster: %s", err)
 	}
@@ -58,7 +58,7 @@ func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.App
 }
 
 // TODO: Make exclusion optional
-func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.AppId, secretName string) error {
+func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string) error {
 	secretList, err := fetchClusterSecrets(app.Name, app.Namespace, cli)
 	if err != nil {
 		return err

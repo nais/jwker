@@ -24,7 +24,7 @@ type TokenDingsToken struct {
 
 var token = TokenDingsToken{}
 
-func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID AppId, tokenDingsUrl string) (*TokenDingsToken, error) {
+func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID ClientId, tokenDingsUrl string) (*TokenDingsToken, error) {
 
 	now := time.Now().Unix()
 

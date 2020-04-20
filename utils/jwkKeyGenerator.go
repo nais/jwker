@@ -25,7 +25,7 @@ func GenerateJwkerKeys() (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
 	if err != nil {
 		return jose.JSONWebKeySet{}, jose.JSONWebKeySet{}, err
 	}
-	return JwksGenerator(jwk)
+	return JwksGenerator(jwk, jose.JSONWebKey{})
 }
 
 func JwkKeyGenerator() (jose.JSONWebKey, error) {
@@ -43,13 +43,13 @@ func JwkKeyGenerator() (jose.JSONWebKey, error) {
 	}
 	return jwk, nil
 }
-func JwksGenerator(jwk jose.JSONWebKey) (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
+func JwksGenerator(jwk jose.JSONWebKey, existing jose.JSONWebKey) (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
 
 	var privateJwks []jose.JSONWebKey
 	var publicJwks []jose.JSONWebKey
 
 	privateJwks = append(privateJwks, jwk)
-	publicJwks = append(publicJwks, jwk.Public())
+	publicJwks = append(publicJwks, jwk.Public(), existing.Public())
 	privateKeyset := jose.JSONWebKeySet{Keys: privateJwks}
 	publicKeyset := jose.JSONWebKeySet{Keys: publicJwks}
 

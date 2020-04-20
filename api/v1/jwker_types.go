@@ -1,6 +1,9 @@
 package v1
 
 import (
+	"time"
+
+	"github.com/nais/jwker/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,6 +43,29 @@ type Jwker struct {
 
 	Spec   JwkerSpec   `json:"spec,omitempty"`
 	Status JwkerStatus `json:"status,omitempty"`
+}
+
+func (s *JwkerStatus) Successfull(hash string) JwkerStatus {
+	return JwkerStatus{
+		SynchronizationTime:  time.Now().UnixNano(),
+		SynchronizationState: controllers.EventRolloutComplete,
+		SynchronizationHash:  hash,
+	}
+}
+
+func (s *JwkerStatus) FailedPrepare(hash string) JwkerStatus {
+	return JwkerStatus{
+		SynchronizationTime:  time.Now().UnixNano(),
+		SynchronizationState: controllers.EventFailedPrepare,
+		SynchronizationHash:  hash,
+	}
+}
+func (s *JwkerStatus) FailedSynchronization(hash string) JwkerStatus {
+	return JwkerStatus{
+		SynchronizationTime:  time.Now().UnixNano(),
+		SynchronizationState: controllers.EventFailedSynchronization,
+		SynchronizationHash:  hash,
+	}
 }
 
 // +kubebuilder:object:root=true

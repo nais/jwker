@@ -69,14 +69,14 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
 
 	// Fetching a token for communicating with tokendings
-	jwkerClientID := tokendings.AppId{Name: "jwker", Namespace: "nais", Cluster: r.ClusterName}
+	jwkerClientID := tokendings.ClientId{Name: "jwker", Namespace: "nais", Cluster: r.ClusterName}
 	jwkerPrivateJwk := r.JwkerPrivateJwks.Keys[0]
 	tokendingsToken, err := tokendings.GetToken(&jwkerPrivateJwk, jwkerClientID, r.TokenDingsUrl)
 	if err != nil {
 		r.logger.Error(err, "unable to fetch token from tokendings")
 		return ctrl.Result{}, err
 	}
-	appClientId := tokendings.AppId{
+	appClientId := tokendings.ClientId{
 		Name:      req.Name,
 		Namespace: req.Namespace,
 		Cluster:   r.ClusterName,
@@ -107,28 +107,48 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	existingJwks, err := r.JwkerStorage.Read(appClientId.ToFileName())
-	fmt.Printf(existingJwks.Keys[0].KeyID)
-
 	hash, err = utils.Hash(j.Spec)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
 	if j.Status.SynchronizationHash == hash && j.Status.SynchronizationState == EventRolloutComplete {
 		return ctrl.Result{}, nil
 	}
 
+	existingJwk, keyIds, err := r.JwkerStorage.Read(appClientId.ToFileName())
+	if err != nil {
+		// if not found acceptable, return empty struct, else return err
+	}
+
 	// Her må vi hente jwks fra storage før vi lager ny jwk.
+
 	clientJwk, err := utils.JwkKeyGenerator()
 	if err != nil {
 		r.logger.Error(err, "Unable to generate client JWK")
+		j.Status = j.Status.FailedPrepare(hash)
+		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+	}
+
+	clientPrivateJwks, clientPublicJwks, err := utils.JwksGenerator(clientJwk, existingJwk)
+
+	if err != nil {
+		r.logger.Error(err, "Unable to generate client JWKS")
+		j.Status = j.Status.FailedPrepare(hash)
 		return ctrl.Result{}, err
 	}
 
-	clientPrivateJwks, clientPublicJwks, err := utils.JwksGenerator(clientJwk)
+	r.logger.Info(fmt.Sprintf("Registering app %s:%s:%s with token-dingz", appClientId.Cluster, appClientId.Namespace, appClientId.Name))
+	clientRegistrationResponse, err := tokendings.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
 	if err != nil {
-		r.logger.Error(err, "Unable to generate client JWKS")
+		r.logger.Error(err, "failed registering client")
+		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+	}
+
+	var keys map[string]int64
+	keys[existingJwk.KeyID] = keyIds[existingJwk.KeyID]
+	keys[clientJwk.KeyID] = time.Now().UnixNano()
+
+	if err := r.JwkerStorage.Write(appClientId.ToFileName(), clientRegistrationResponse, keys); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -138,19 +158,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	r.logger.Info(fmt.Sprintf("Registering app %s:%s:%s with token-dingz", appClientId.Cluster, appClientId.Namespace, appClientId.Name))
-	clientRegistrationResponse, err := tokendings.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
-	if err != nil {
-		r.logger.Error(err, "failed registering client")
-		return ctrl.Result{
-			Requeue:      false,
-			RequeueAfter: time.Second * 10,
-		}, err
-	}
-
-	if err := r.JwkerStorage.Write(appClientId.ToFileName(), clientRegistrationResponse); err != nil {
-		return ctrl.Result{}, err
-	}
+	j.Status = j.Status.Successfull(hash)
 
 	return ctrl.Result{}, nil
 }

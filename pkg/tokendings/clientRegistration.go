@@ -14,17 +14,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type AppId struct {
+type ClientId struct {
 	Name      string
 	Namespace string
 	Cluster   string
 }
 
-func (a *AppId) String() string {
+func (a *ClientId) String() string {
 	return fmt.Sprintf("%s:%s:%s", a.Cluster, a.Namespace, a.Name)
 }
 
-func (a *AppId) ToFileName() string {
+func (a *ClientId) ToFileName() string {
 	return fmt.Sprintf("%s/%s/%s", a.Cluster, a.Namespace, a.Name)
 }
 
@@ -46,7 +46,7 @@ type SoftwareStatement struct {
 	AccessPolicyOutbound []string `json:"accessPolicyOutbound"`
 }
 
-func DeleteClient(accessToken string, tokenDingsUrl string, appClientId AppId) error {
+func DeleteClient(accessToken string, tokenDingsUrl string, appClientId ClientId) error {
 	fmt.Printf("%s/registration/client/%s\n", tokenDingsUrl, url.QueryEscape(appClientId.String()))
 	request, err := http.NewRequest("DELETE", fmt.Sprintf("%s/registration/client/%s", tokenDingsUrl, url.QueryEscape(appClientId.String())), nil)
 	if err != nil {
@@ -67,7 +67,7 @@ func DeleteClient(accessToken string, tokenDingsUrl string, appClientId AppId) e
 	return fmt.Errorf("Something went wrong when deleting client from tokendings")
 }
 
-func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId AppId, j *v1.Jwker) ([]byte, error) {
+func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId ClientId, j *v1.Jwker) ([]byte, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: jwkerPrivateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -124,7 +124,7 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 	return bodyBytes, nil
 }
 
-func createSoftwareStatement(jwker *v1.Jwker, appId AppId) (SoftwareStatement, error) {
+func createSoftwareStatement(jwker *v1.Jwker, appId ClientId) (SoftwareStatement, error) {
 	var inbound []string
 	var outbound []string
 	for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
@@ -142,7 +142,7 @@ func createSoftwareStatement(jwker *v1.Jwker, appId AppId) (SoftwareStatement, e
 	}, nil
 }
 
-func parseAccessPolicy(rule v1.AccessPolicyRule, appId AppId) (string, string) {
+func parseAccessPolicy(rule v1.AccessPolicyRule, appId ClientId) (string, string) {
 	cluster := rule.Cluster
 	namespace := rule.Namespace
 	if cluster == "" {
