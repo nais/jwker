@@ -49,7 +49,10 @@ func JwksGenerator(jwk jose.JSONWebKey, existing jose.JSONWebKey) (jose.JSONWebK
 	var publicJwks []jose.JSONWebKey
 
 	privateJwks = append(privateJwks, jwk)
-	publicJwks = append(publicJwks, jwk.Public(), existing.Public())
+	publicJwks = append(publicJwks, jwk.Public())
+	if len(existing.KeyID) > 0 {
+		publicJwks = append(publicJwks, existing.Public())
+	}
 	privateKeyset := jose.JSONWebKeySet{Keys: privateJwks}
 	publicKeyset := jose.JSONWebKeySet{Keys: publicJwks}
 
