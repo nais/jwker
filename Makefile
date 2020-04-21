@@ -23,7 +23,7 @@ manager: generate fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	go run ./cmd/jwker/main.go --clustername=the_best_cluster_in_the_finstadjordet --storageBucket=jwker-test --credentialsPath=./sa-credentials.json
+	go run ./cmd/jwker/main.go --clustername=the_best_cluster_in_the_finstadjordet --storageBucket=jwker-test --port 8081 --credentialsPath=./sa-credentials.json
 
 # Install CRDs into a cluster
 install: manifests
