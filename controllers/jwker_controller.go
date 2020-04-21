@@ -11,6 +11,7 @@ import (
 	"github.com/nais/jwker/pkg/storage"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,25 +30,17 @@ type JwkerReconciler struct {
 	TokenDingsUrl    string
 	logger           logr.Logger
 	JwkerStorage     storage.JwkerStorage
+	JwkerMetrics     map[string]prometheus.Metric
 }
 
 // +kubebuilder:rbac:groups=jwker.nais.io,resources=jwkers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=jwker.nais.io,resources=jwkers/status,verbs=get;update;patch
 
-const (
-	EventSynchronized          = "Synchronized"
-	EventRolloutComplete       = "RolloutComplete"
-	EventFailedPrepare         = "FailedPrepare"
-	EventFailedSynchronization = "FailedSynchronization"
-	EventFailedStatusUpdate    = "FailedStatusUpdate"
-	EventRetrying              = "Retrying"
-)
-
 func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	changed := false
 	hash := ""
-	state := EventFailedSynchronization
+	var j jwkerv1.Jwker
 
 	// Update Jwker resource with status event
 	defer func() {
@@ -59,11 +52,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			r.logger.Error(err, "Unable to fetch current jwker from cluster")
 			return
 		}
-		existing.Status = jwkerv1.JwkerStatus{
-			SynchronizationTime:  time.Now().UnixNano(),
-			SynchronizationState: state,
-			SynchronizationHash:  hash,
-		}
+		existing.Status = j.Status
 		r.Update(ctx, &existing)
 	}()
 	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
@@ -73,8 +62,10 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	jwkerPrivateJwk := r.JwkerPrivateJwks.Keys[0]
 	tokendingsToken, err := tokendings.GetToken(&jwkerPrivateJwk, jwkerClientID, r.TokenDingsUrl)
 	if err != nil {
-		r.logger.Error(err, "unable to fetch token from tokendings")
-		return ctrl.Result{}, err
+		r.logger.Error(err, "unable to fetch jwker-token from tokendings. will retry in 10 secs.")
+		return ctrl.Result{
+			RequeueAfter: time.Second * 10,
+		}, nil
 	}
 	appClientId := tokendings.ClientId{
 		Name:      req.Name,
@@ -82,7 +73,6 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		Cluster:   r.ClusterName,
 	}
 
-	var j jwkerv1.Jwker
 	if err := r.Get(ctx, req.NamespacedName, &j); errors.IsNotFound(err) {
 		r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
 
@@ -111,22 +101,22 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if j.Status.SynchronizationHash == hash && j.Status.SynchronizationState == EventRolloutComplete {
+	if j.Status.SynchronizationHash == hash && j.Status.SynchronizationState == jwkerv1.EventRolloutComplete {
 		return ctrl.Result{}, nil
 	}
 
 	existingJwk, keyIds, err := r.JwkerStorage.Read(appClientId.ToFileName())
 	if err != nil {
-		// if not found acceptable, return empty struct, else return err
+		if err.Error() != "storage: object doesn't exist" {
+			return ctrl.Result{}, err
+		}
 	}
-
-	// Her må vi hente jwks fra storage før vi lager ny jwk.
 
 	clientJwk, err := utils.JwkKeyGenerator()
 	if err != nil {
 		r.logger.Error(err, "Unable to generate client JWK")
 		j.Status = j.Status.FailedPrepare(hash)
-		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
 	clientPrivateJwks, clientPublicJwks, err := utils.JwksGenerator(clientJwk, existingJwk)
@@ -141,11 +131,13 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	clientRegistrationResponse, err := tokendings.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
 	if err != nil {
 		r.logger.Error(err, "failed registering client")
-		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
-	var keys map[string]int64
-	keys[existingJwk.KeyID] = keyIds[existingJwk.KeyID]
+	keys := make(map[string]int64)
+	if len(existingJwk.KeyID) > 0 {
+		keys[existingJwk.KeyID] = keyIds[existingJwk.KeyID]
+	}
 	keys[clientJwk.KeyID] = time.Now().UnixNano()
 
 	if err := r.JwkerStorage.Write(appClientId.ToFileName(), clientRegistrationResponse, keys); err != nil {
@@ -159,7 +151,9 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	j.Status = j.Status.Successfull(hash)
-
+	changed = true
+	r.JwkerMetrics["jwkers_processed_total"].(prometheus.Counter).Inc()
+	r.JwkerMetrics["jwkers_total"].(prometheus.Gauge).Inc()
 	return ctrl.Result{}, nil
 }
 
