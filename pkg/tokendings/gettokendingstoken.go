@@ -38,9 +38,6 @@ func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID ClientId, tokenDingsUrl
 }
 
 func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) error {
-
-	// Todo: Retries
-
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -69,7 +66,6 @@ func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl str
 	if err != nil {
 		return err
 	}
-	//fmt.Printf("token to tokendings: %s\n", rawJWT)
 
 	client := http.Client{}
 
@@ -80,6 +76,9 @@ func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl str
 		"client_assertion":      []string{rawJWT},
 	}.Encode()
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/token", tokenDingsUrl), strings.NewReader(data))
+	if err != nil {
+		return err
+	}
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(request)
