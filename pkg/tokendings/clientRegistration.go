@@ -11,7 +11,6 @@ import (
 	v1 "github.com/nais/jwker/api/v1"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type ClientId struct {
@@ -90,14 +89,14 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 	if err != nil {
 		return nil, err
 	}
-
-	data, err := json.Marshal(ClientRegistration{
+	cr := ClientRegistration{
 		ClientName:        appClientId.String(),
 		Jwks:              *clientPublicJwks,
 		SoftwareStatement: rawJWT,
-	})
+	}
+	data, err := json.Marshal(cr)
 	if err != nil {
-		ctrl.Log.Error(err, "Unable to marshal data")
+		return nil, err
 	}
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/client", tokenDingsUrl), bytes.NewReader(data))
 	if err != nil {
