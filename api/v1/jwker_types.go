@@ -3,8 +3,13 @@ package v1
 import (
 	"time"
 
-	"github.com/nais/jwker/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	EventRolloutComplete       = "RolloutComplete"
+	EventFailedPrepare         = "FailedPrepare"
+	EventFailedSynchronization = "FailedSynchronization"
 )
 
 type JwkerSpec struct {
@@ -48,7 +53,7 @@ type Jwker struct {
 func (s *JwkerStatus) Successfull(hash string) JwkerStatus {
 	return JwkerStatus{
 		SynchronizationTime:  time.Now().UnixNano(),
-		SynchronizationState: controllers.EventRolloutComplete,
+		SynchronizationState: EventRolloutComplete,
 		SynchronizationHash:  hash,
 	}
 }
@@ -56,14 +61,14 @@ func (s *JwkerStatus) Successfull(hash string) JwkerStatus {
 func (s *JwkerStatus) FailedPrepare(hash string) JwkerStatus {
 	return JwkerStatus{
 		SynchronizationTime:  time.Now().UnixNano(),
-		SynchronizationState: controllers.EventFailedPrepare,
+		SynchronizationState: EventFailedPrepare,
 		SynchronizationHash:  hash,
 	}
 }
 func (s *JwkerStatus) FailedSynchronization(hash string) JwkerStatus {
 	return JwkerStatus{
 		SynchronizationTime:  time.Now().UnixNano(),
-		SynchronizationState: controllers.EventFailedSynchronization,
+		SynchronizationState: EventFailedSynchronization,
 		SynchronizationHash:  hash,
 	}
 }
