@@ -1,9 +1,9 @@
 # Jwker
 An operator that updates [TokenDings](https://github.com/nais/token-exchange) based on the custom resource `nais.io/Jwker`.
 
-The `Jwker` spec contains accesspolicies from `nais.io/Application` and a unique secret name for inceting a private JWKS to the application's container.
+The `Jwker` spec contains accesspolicies from `nais.io/Application` and a unique secret name for injecting a private JWKS to the application's container.
 
-Applications use the private JWKS when they request `access_tokens` for other applications from TokenDings.
+Applications use the private JWKS when they request `access_tokens` for comunnicating with other applications from TokenDings.
 
 ## Functionality
 1. When an Application is generated or updated in a cluster, Naiserator will create a new `Jwker` resource with a new unique secret name.
