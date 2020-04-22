@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/nais/jwker/pkg/storage"
 	"github.com/nais/jwker/utils"
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -20,58 +19,24 @@ import (
 
 	jwkerv1 "github.com/nais/jwker/api/v1"
 	"github.com/nais/jwker/controllers"
+	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
-
-	// metrics
-	jwkersTotal = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "jwkers_total",
-		})
-	jwkersProcessedTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "jwkers_processed_total",
-			Help: "Number of jwkers processed",
-		},
-	)
-	jwkersDeleted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "jwkers_deleted",
-			Help: "Number of jwkers deleted",
-		},
-	)
-	jwkerSecretsCreated = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "jwkers_secrets_created",
-			Help: "Number of jwker secrets created",
-		},
-	)
-	jwkerSecretsDeleted = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "jwkers_secrets_deleted",
-			Help: "Number of jwker secrets deleted",
-		})
-	jwkerSecretsTotal = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "jwker_secrets_total",
-			Help: "Number of jwker secrets total",
-		},
-	)
-	jwkerMetrics = make(map[string]prometheus.Metric)
 )
 
 func init() {
 	// Register custom metrics with the global prometheus registry
-	metrics.Registry.MustRegister(jwkersTotal, jwkersProcessedTotal)
-	jwkerMetrics["jwkers_total"] = jwkersTotal
-	jwkerMetrics["jwkers_processed_total"] = jwkersProcessedTotal
-	jwkerMetrics["jwkers_deleted"] = jwkersDeleted
-	jwkerMetrics["jwkers_secrets_created"] = jwkerSecretsCreated
-	jwkerMetrics["jwkers_secrets_total"] = jwkerSecretsTotal
+
+	metrics.Registry.MustRegister(
+		jwkermetrics.JwkersTotal,
+		jwkermetrics.JwkersProcessedCount,
+		jwkermetrics.JwkerSecretsTotal,
+		jwkermetrics.JwkerBucketObjects,
+	)
 
 	_ = clientgoscheme.AddToScheme(scheme)
 
@@ -131,7 +96,6 @@ func main() {
 		JwkerPrivateJwks: &privateJwks,
 		TokenDingsUrl:    tokenDingsUrl,
 		JwkerStorage:     jwkerStorage,
-		JwkerMetrics:     jwkerMetrics,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)

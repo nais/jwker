@@ -7,11 +7,11 @@ import (
 
 	"github.com/go-logr/logr"
 	jwkerv1 "github.com/nais/jwker/api/v1"
+	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/storage"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
-	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +30,6 @@ type JwkerReconciler struct {
 	TokenDingsUrl    string
 	logger           logr.Logger
 	JwkerStorage     storage.JwkerStorage
-	JwkerMetrics     map[string]prometheus.Metric
 }
 
 // +kubebuilder:rbac:groups=jwker.nais.io,resources=jwkers,verbs=get;list;watch;create;update;patch;delete
@@ -41,6 +40,16 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	changed := false
 	hash := ""
 	var j jwkerv1.Jwker
+	jwkermetrics.JwkersProcessedCount.Inc()
+	if err := jwkermetrics.UpdateBucketMetric(r.JwkerStorage); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := jwkermetrics.SetTotalJwkersMetric(r); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := jwkermetrics.SetTotalJwkerSecrets(r); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Update Jwker resource with status event
 	defer func() {
@@ -54,6 +63,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 		existing.Status = j.Status
 		r.Update(ctx, &existing)
+
 	}()
 	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
 
@@ -87,10 +97,14 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			r.logger.Error(err, "Failed deleting secrets from cluster")
 			return ctrl.Result{}, err
 		}
+		jwkermetrics.JwkerSecretsTotal.Dec()
 
 		r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from storage bucket", req.Name, req.Namespace))
 		if err := r.JwkerStorage.Delete(appClientId.ToFileName()); err != nil {
 			r.logger.Error(err, "Failed deleting application from storage bucket")
+			return ctrl.Result{}, err
+		}
+		if err := jwkermetrics.UpdateBucketMetric(r.JwkerStorage); err != nil {
 			return ctrl.Result{}, err
 		}
 
@@ -149,11 +163,13 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		r.logger.Error(err, "Reconciling secrets failed...")
 		return ctrl.Result{}, err
 	}
+	if err := jwkermetrics.SetTotalJwkerSecrets(r); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	j.Status = j.Status.Successfull(hash)
 	changed = true
-	r.JwkerMetrics["jwkers_processed_total"].(prometheus.Counter).Inc()
-	r.JwkerMetrics["jwkers_total"].(prometheus.Gauge).Inc()
+
 	return ctrl.Result{}, nil
 }
 

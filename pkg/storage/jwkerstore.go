@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/nais/jwker/pkg/tokendings"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"gopkg.in/square/go-jose.v2"
 )
@@ -21,6 +23,7 @@ type JwkerStorage interface {
 	Write(fileName string, data []byte, keys map[string]int64) error
 	Delete(fileName string) error
 	Read(fileName string) (jose.JSONWebKey, map[string]int64, error)
+	Count() (int, error)
 }
 
 type jwkerStorage struct {
@@ -118,4 +121,25 @@ func (j *jwkerStorage) Write(bucketObjectName string, data []byte, keys map[stri
 		return err
 	}
 	return nil
+}
+
+func (j *jwkerStorage) Count() (int, error) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	it := j.client.Bucket(j.bucketName).Objects(ctx, nil)
+
+	count := 0
+
+	for {
+		_, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return 0, err
+		}
+		count++
+	}
+	return count, nil
 }
