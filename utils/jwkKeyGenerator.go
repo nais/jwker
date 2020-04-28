@@ -12,6 +12,11 @@ import (
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+type KeySet struct {
+	Private jose.JSONWebKeySet
+	Public  jose.JSONWebKeySet
+}
+
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -20,12 +25,15 @@ func RandStringBytes(n int) string {
 	return string(b)
 }
 
-func GenerateJwkerKeys() (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
+func GenerateJwkerKeys() (KeySet, error) {
 	jwk, err := JwkKeyGenerator()
 	if err != nil {
-		return jose.JSONWebKeySet{}, jose.JSONWebKeySet{}, err
+		return KeySet{}, err
 	}
-	return JwksGenerator(jwk, jose.JSONWebKey{})
+	return KeySet{
+		Private: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk}},
+		Public:  jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk.Public()}},
+	}, nil
 }
 
 func JwkKeyGenerator() (jose.JSONWebKey, error) {
@@ -43,7 +51,8 @@ func JwkKeyGenerator() (jose.JSONWebKey, error) {
 	}
 	return jwk, nil
 }
-func JwksGenerator(jwk jose.JSONWebKey, existing jose.JSONWebKey) (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
+
+func JwksWithExistingPublicKey(jwk jose.JSONWebKey, existing jose.JSONWebKey) KeySet {
 
 	var privateJwks []jose.JSONWebKey
 	var publicJwks []jose.JSONWebKey
@@ -56,5 +65,5 @@ func JwksGenerator(jwk jose.JSONWebKey, existing jose.JSONWebKey) (jose.JSONWebK
 	privateKeyset := jose.JSONWebKeySet{Keys: privateJwks}
 	publicKeyset := jose.JSONWebKeySet{Keys: publicJwks}
 
-	return privateKeyset, publicKeyset, nil
+	return KeySet{privateKeyset, publicKeyset}
 }

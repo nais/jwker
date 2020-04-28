@@ -1,3 +1,10 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+
+---
 apiVersion: jwker.nais.io/v1
 kind: Jwker
 metadata:

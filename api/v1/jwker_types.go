@@ -50,7 +50,7 @@ type Jwker struct {
 	Status JwkerStatus `json:"status,omitempty"`
 }
 
-func (s *JwkerStatus) Successfull(hash string) JwkerStatus {
+func (s *JwkerStatus) Successful(hash string) JwkerStatus {
 	return JwkerStatus{
 		SynchronizationTime:  time.Now().UnixNano(),
 		SynchronizationState: EventRolloutComplete,

@@ -30,6 +30,125 @@ type JwkerReconciler struct {
 	TokenDingsUrl    string
 	logger           logr.Logger
 	JwkerStorage     storage.JwkerStorage
+	TokendingsToken  *tokendings.TokenResponse
+}
+
+func (r *JwkerReconciler) privateKey() *jose.JSONWebKey {
+	return &r.JwkerPrivateJwks.Keys[0]
+}
+
+func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
+	return tokendings.ClientId{
+		Name:      req.Name,
+		Namespace: req.Namespace,
+		Cluster:   r.ClusterName,
+	}
+}
+
+func (r *JwkerReconciler) refreshToken() {
+	var err error
+	exp := 1 * time.Second
+
+	t := time.NewTimer(exp)
+	for range t.C {
+
+		// Fetching a token for communicating with tokendings
+		jwkerClientID := tokendings.ClientId{Name: "jwker", Namespace: "nais", Cluster: r.ClusterName}
+		r.TokendingsToken, err = tokendings.GetToken(r.privateKey(), jwkerClientID, r.TokenDingsUrl)
+		if err != nil {
+			r.logger.Error(err, "unable to fetch jwker-token from tokendings. will retry in 10 secs.")
+		} else {
+			secs := float64(r.TokendingsToken.ExpiresIn) / 3
+			exp = time.Duration(int(secs)) * time.Second
+			t.Reset(exp)
+		}
+	}
+}
+
+// delete all associated objects
+// TODO: needs finalizer
+func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
+
+	var err error
+
+	aid := r.appClientID(req)
+
+	r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
+
+	r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from tokendings", req.Name, req.Namespace))
+	if err = tokendings.DeleteClient(ctx, r.TokendingsToken.AccessToken, r.TokenDingsUrl, aid); err != nil {
+		return fmt.Errorf("deleting resource from Tokendings: %s", err)
+	}
+
+	r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from cluster", req.Name, req.Namespace))
+	if err := secret.DeleteClusterSecrets(r, ctx, aid, ""); err != nil {
+		return fmt.Errorf("deleting secrets from cluster: %s", err)
+	}
+	jwkermetrics.JwkerSecretsTotal.Dec()
+
+	r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from storage bucket", req.Name, req.Namespace))
+	// TODO: pass context
+	if err := r.JwkerStorage.Delete(aid.ToFileName()); err != nil {
+		return fmt.Errorf("deleting application from storage bucket: %s", err)
+	}
+	if err := jwkermetrics.UpdateBucketMetric(r.JwkerStorage); err != nil {
+		return err
+	}
+
+	return client.IgnoreNotFound(err)
+}
+
+func (r *JwkerReconciler) prepareJwks(ctx context.Context, req ctrl.Request) (utils.KeySet, error) {
+	appClientId := r.appClientID(req)
+
+	existingJwk, keyIds, err := r.JwkerStorage.Read(appClientId.ToFileName())
+	if err != nil {
+		if err.Error() != "storage: object doesn't exist" {
+			return ctrl.Result{}, err
+		}
+	}
+
+	clientJwk, err := utils.JwkKeyGenerator()
+	if err != nil {
+		r.logger.Error(err, "Unable to generate client JWK")
+		j.Status = j.Status.FailedPrepare(hash)
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
+	}
+
+	clientPrivateJwks, clientPublicJwks:= utils.JwksWithExistingPublicKey(clientJwk, existingJwk)
+
+
+}
+
+func (r *JwkerReconciler) create(ctx context.Context, req ctrl.Request) error {
+
+	keyset, err := r.prepareJwks(ctx, req)
+	r.logger.Info(fmt.Sprintf("Registering app %s:%s:%s with token-dingz", appClientId.Cluster, appClientId.Namespace, appClientId.Name))
+	clientRegistrationResponse, err := tokendings.RegisterClient(r.privateKey(), &clientPublicJwks, r.TokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
+	if err != nil {
+		r.logger.Error(err, "failed registering client")
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
+	}
+
+	keys := make(map[string]int64)
+	if len(existingJwk.KeyID) > 0 {
+		keys[existingJwk.KeyID] = keyIds[existingJwk.KeyID]
+	}
+	keys[clientJwk.KeyID] = time.Now().UnixNano()
+
+	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", appClientId.Namespace, appClientId.Name))
+	if err := secret.ReconcileSecrets(r, ctx, appClientId, j.Spec.SecretName, clientPrivateJwks); err != nil {
+		r.logger.Error(err, "Reconciling secrets failed...")
+		return ctrl.Result{}, err
+	}
+
+	if err := r.JwkerStorage.Write(appClientId.ToFileName(), clientRegistrationResponse, keys); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := jwkermetrics.SetTotalJwkerSecrets(r); err != nil {
+		return ctrl.Result{}, err
+	}
 }
 
 // +kubebuilder:rbac:groups=jwker.nais.io,resources=jwkers,verbs=get;list;watch;create;update;patch;delete
@@ -67,51 +186,22 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}()
 	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
 
-	// Fetching a token for communicating with tokendings
-	jwkerClientID := tokendings.ClientId{Name: "jwker", Namespace: "nais", Cluster: r.ClusterName}
-	jwkerPrivateJwk := r.JwkerPrivateJwks.Keys[0]
-	tokendingsToken, err := tokendings.GetToken(&jwkerPrivateJwk, jwkerClientID, r.TokenDingsUrl)
-	if err != nil {
-		r.logger.Error(err, "unable to fetch jwker-token from tokendings. will retry in 10 secs.")
+	if r.TokendingsToken == nil {
 		return ctrl.Result{
 			RequeueAfter: time.Second * 10,
 		}, nil
 	}
-	appClientId := tokendings.ClientId{
-		Name:      req.Name,
-		Namespace: req.Namespace,
-		Cluster:   r.ClusterName,
-	}
 
+	// purge other systems if resource was deleted
 	if err := r.Get(ctx, req.NamespacedName, &j); errors.IsNotFound(err) {
-		r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
-
-		r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from tokendings", req.Name, req.Namespace))
-		if err := tokendings.DeleteClient(tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId); err != nil {
-			r.logger.Error(err, "Failed deleting resource from Tokendings")
-			return ctrl.Result{}, err
+		err := r.purge(ctx, req)
+		if err != nil {
+			r.logger.Error(err, "failed purge")
 		}
-
-		r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from cluster", req.Name, req.Namespace))
-		if err := secret.DeleteClusterSecrets(r, ctx, appClientId, ""); err != nil {
-			r.logger.Error(err, "Failed deleting secrets from cluster")
-			return ctrl.Result{}, err
-		}
-		jwkermetrics.JwkerSecretsTotal.Dec()
-
-		r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from storage bucket", req.Name, req.Namespace))
-		if err := r.JwkerStorage.Delete(appClientId.ToFileName()); err != nil {
-			r.logger.Error(err, "Failed deleting application from storage bucket")
-			return ctrl.Result{}, err
-		}
-		if err := jwkermetrics.UpdateBucketMetric(r.JwkerStorage); err != nil {
-			return ctrl.Result{}, err
-		}
-
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	hash, err = utils.Hash(j.Spec)
+	hash, err := utils.Hash(j.Spec)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -119,55 +209,8 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, nil
 	}
 
-	existingJwk, keyIds, err := r.JwkerStorage.Read(appClientId.ToFileName())
-	if err != nil {
-		if err.Error() != "storage: object doesn't exist" {
-			return ctrl.Result{}, err
-		}
-	}
 
-	clientJwk, err := utils.JwkKeyGenerator()
-	if err != nil {
-		r.logger.Error(err, "Unable to generate client JWK")
-		j.Status = j.Status.FailedPrepare(hash)
-		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
-	}
-
-	clientPrivateJwks, clientPublicJwks, err := utils.JwksGenerator(clientJwk, existingJwk)
-
-	if err != nil {
-		r.logger.Error(err, "Unable to generate client JWKS")
-		j.Status = j.Status.FailedPrepare(hash)
-		return ctrl.Result{}, err
-	}
-
-	r.logger.Info(fmt.Sprintf("Registering app %s:%s:%s with token-dingz", appClientId.Cluster, appClientId.Namespace, appClientId.Name))
-	clientRegistrationResponse, err := tokendings.RegisterClient(&jwkerPrivateJwk, &clientPublicJwks, tokendingsToken.AccessToken, r.TokenDingsUrl, appClientId, &j)
-	if err != nil {
-		r.logger.Error(err, "failed registering client")
-		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
-	}
-
-	keys := make(map[string]int64)
-	if len(existingJwk.KeyID) > 0 {
-		keys[existingJwk.KeyID] = keyIds[existingJwk.KeyID]
-	}
-	keys[clientJwk.KeyID] = time.Now().UnixNano()
-
-	if err := r.JwkerStorage.Write(appClientId.ToFileName(), clientRegistrationResponse, keys); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", appClientId.Namespace, appClientId.Name))
-	if err := secret.ReconcileSecrets(r, ctx, appClientId, j.Spec.SecretName, clientPrivateJwks); err != nil {
-		r.logger.Error(err, "Reconciling secrets failed...")
-		return ctrl.Result{}, err
-	}
-	if err := jwkermetrics.SetTotalJwkerSecrets(r); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	j.Status = j.Status.Successfull(hash)
+	j.Status = j.Status.Successful(hash)
 	changed = true
 
 	return ctrl.Result{}, nil

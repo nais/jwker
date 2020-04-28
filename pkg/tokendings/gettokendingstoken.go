@@ -13,31 +13,22 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-type TokenDingsToken struct {
+type TokenResponse struct {
 	AccessToken     string `json:"access_token"`
 	IssuedTokenType string `json:"issued_token_type"`
 	TokenType       string `json:"token_type"`
 	ExpiresIn       int64  `json:"expires_in"`
 	Scope           string `json:"scope"`
-	Created         int64
 }
 
-var token = TokenDingsToken{}
+const (
+	tokenDingsTokenEndpoint  = "%s/token"
+	tokenDingsClientEndpoint = "%s/registration/client"
+	grantType                = "client_credentials"
+	clientAssertionType      = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+)
 
-func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID ClientId, tokenDingsUrl string) (*TokenDingsToken, error) {
-
-	now := time.Now().Unix()
-
-	if token.AccessToken == "" || (token.Created+token.ExpiresIn) < now-30 {
-		if err := fetchNewToken(privateJwk, jwkerClientID.String(), tokenDingsUrl); err != nil {
-			return &TokenDingsToken{}, err
-		}
-	}
-
-	return &token, nil
-}
-
-func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl string) error {
+func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID ClientId, tokenDingsUrl string) (*TokenResponse, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -45,17 +36,17 @@ func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl str
 
 	rsaSigner, err := jose.NewSigner(key, &signerOpts)
 	if err != nil {
-		return err
+		return nil,err
 	}
 
 	builder := jwt.Signed(rsaSigner)
 
-	tokenDingsTokenEndpoint := fmt.Sprintf("%s/registration/token", tokenDingsUrl)
+	t := fmt.Sprintf(tokenDingsTokenEndpoint, tokenDingsUrl)
 	now := time.Now()
 	claims := jwt.Claims{
-		Issuer:    jwkerClientID,
-		Subject:   jwkerClientID,
-		Audience:  []string{tokenDingsTokenEndpoint},
+		Issuer:    jwkerClientID.String(),
+		Subject:   jwkerClientID.String(),
+		Audience:  []string{t},
 		Expiry:    jwt.NewNumericDate(now.Add(time.Second * 500)),
 		NotBefore: jwt.NewNumericDate(now),
 		IssuedAt:  jwt.NewNumericDate(now),
@@ -64,32 +55,31 @@ func fetchNewToken(privateJwk *jose.JSONWebKey, jwkerClientID, tokenDingsUrl str
 	builder = builder.Claims(claims)
 	rawJWT, err := builder.CompactSerialize()
 	if err != nil {
-		return err
+		return nil,err
 	}
 
 	client := http.Client{}
 
 	data := url.Values{
-		"scope":                 []string{fmt.Sprintf("%s/registration/client", tokenDingsUrl)},
-		"grant_type":            []string{"client_credentials"},
-		"client_assertion_type": []string{"urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+		"scope":                 []string{fmt.Sprintf(tokenDingsClientEndpoint, tokenDingsUrl)},
+		"grant_type":            []string{grantType},
+		"client_assertion_type": []string{clientAssertionType},
 		"client_assertion":      []string{rawJWT},
 	}.Encode()
-	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/token", tokenDingsUrl), strings.NewReader(data))
+	request, err := http.NewRequest("POST", fmt.Sprintf(tokenDingsTokenEndpoint, tokenDingsUrl), strings.NewReader(data))
 	if err != nil {
-		return err
+		return nil,err
 	}
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(request)
 	if err != nil {
-		return err
+		return nil,err
 	}
 	defer resp.Body.Close()
 
-	if json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return err
+	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
+		return nil,err
 	}
-	token.Created = time.Now().Unix()
-	return nil
+	return nil,nil
 }

@@ -11,6 +11,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/prometheus/client_golang v1.0.0
+	github.com/spf13/pflag v1.0.5
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
 	google.golang.org/api v0.4.0
 	gopkg.in/square/go-jose.v2 v2.2.2

@@ -32,15 +32,15 @@ type jwkerStorage struct {
 	client          *storage.Client
 }
 
-type StorageObject struct {
-	Keys map[string]int64                      `json:"keys"`
-	Data tokendings.ClientRegistrationResponse `json:"data"`
+type Object struct {
+	Timestamps                 map[string]int64                      `json:"keys"`
+	ClientRegistrationResponse tokendings.ClientRegistrationResponse `json:"data"`
 }
 
-func (s *StorageObject) getYoungest() jose.JSONWebKey {
+func (s *Object) getYoungest() jose.JSONWebKey {
 	var youngest int64
 	var youngestKey jose.JSONWebKey
-	for keyID, creationTime := range s.Keys {
+	for keyID, creationTime := range s.Timestamps {
 		if creationTime > youngest {
 			youngest = creationTime
 			youngestKey = s.getKeyById(keyID)
@@ -49,8 +49,8 @@ func (s *StorageObject) getYoungest() jose.JSONWebKey {
 	return youngestKey
 }
 
-func (s *StorageObject) getKeyById(keyId string) jose.JSONWebKey {
-	return s.Data.Jwks.Key(keyId)[0]
+func (s *Object) getKeyById(keyId string) jose.JSONWebKey {
+	return s.ClientRegistrationResponse.Jwks.Key(keyId)[0]
 }
 
 func New(credentialsPath, bucketName string) (JwkerStorage, error) {
@@ -84,14 +84,14 @@ func (j *jwkerStorage) Read(bucketObjectName string) (jose.JSONWebKey, map[strin
 		fmt.Printf("Failed to read from bucket %s\n", err)
 		return jose.JSONWebKey{}, nil, err
 	}
-	var storageObject = StorageObject{}
+	var storageObject = Object{}
 
 	if err := json.Unmarshal(data, &storageObject); err != nil {
 		fmt.Printf("Failed to unmarshall %s\n", err)
 		return jose.JSONWebKey{}, nil, err
 	}
 
-	return storageObject.getYoungest(), storageObject.Keys, nil
+	return storageObject.getYoungest(), storageObject.Timestamps, nil
 
 }
 
@@ -102,9 +102,9 @@ func (j *jwkerStorage) Write(bucketObjectName string, data []byte, keys map[stri
 		return err
 	}
 
-	storageOject := StorageObject{
-		Keys: keys,
-		Data: clientResponse,
+	storageOject := Object{
+		Timestamps:                 keys,
+		ClientRegistrationResponse: clientResponse,
 	}
 	storageJson, err := json.MarshalIndent(storageOject, "", " ")
 	if err != nil {

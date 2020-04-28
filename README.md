@@ -15,6 +15,10 @@ Applications use the private JWKS when they request `access_tokens` for comunnic
     1. Each application is registered with a unique identifier in the form of `clustername:namespace:application` 
 
 ## Development
+```
+brew install kustomize
+go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.5
+```
 Deploy to your local cluster using
 
 `make install && make deploy && make run`

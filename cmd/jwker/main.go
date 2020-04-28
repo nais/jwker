@@ -53,6 +53,7 @@ func main() {
 	var credentialsPath string
 	var port string
 
+	// TODO: run these on same port
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.StringVar(&port, "port", "8080", "The address the .well-know endpoints is served on.")
 	flag.StringVar(&clusterName, "clustername", "cluster_name_not_set", "Name of runtime cluster")
@@ -74,6 +75,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// lag transaksjon av rotation
+	// cache privatnøkkel i k8s-secret
 	privateJwks, publicJwks, err := utils.GenerateJwkerKeys()
 	if err != nil {
 		setupLog.Error(err, "Unable to generate jwks")
