@@ -16,14 +16,16 @@ cluster <- naiserator: read application resource
 cluster <- naiserator: apply jwker resource
 note left: containing accessPolicies and unique secret name
 jwker -> cluster: read jwker resource
-jwker -> cluster: read existing jwker secret
+jwker -> cluster: get in-use secret name from deployment
+jwker -> cluster: get all jwker-created secrets for app
+jwker -> cluster: write new secret
+jwker -> cluster: delete unreferenced secrets
+cluster -> application: inject new secret
 jwker -> jwker: Create new jwks
 jwker -> tokendings: update
 note right: jwks/key-id/accessPolicy json
 jwker -> cluster: create secret
 note left: jwks with private jwk
-jwker -> cluster: delete old application secret
-cluster -> application: inject secret
 
 ==Call another application==
 enduser -> application: fetch resource
@@ -48,3 +50,5 @@ anotherapplication -> tokendings: fetch public keys
 note right: public keys from tokendings
 anotherapplication -> anotherapplication: validate token from application
 anotherapplication -> application: response
+
+@enduml
