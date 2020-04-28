@@ -9,6 +9,7 @@ participant application as "application"
 participant tokendings as "tokendings"
 participant anotherapplication as "anotherapplication"
 participant idprovider as "idprovider"
+database db
 
 ==Deploy application==
 developer -> cluster: apply ´application´ resource
@@ -20,12 +21,14 @@ jwker -> cluster: get in-use secret name from deployment
 jwker -> cluster: get all jwker-created secrets for app
 jwker -> cluster: write new secret
 jwker -> cluster: delete unreferenced secrets
-cluster -> application: inject new secret
-jwker -> jwker: Create new jwks
-jwker -> tokendings: update
+jwker -> jwker: Create jwks for application
+jwker ->azure: POST /token
+note left: retrieve bearer token based on scope, cert and self issued jwt\nscope=api://tokendings-id/.default\nclient_assertion=jwt\ngrant_type=client_credentials
+jwker -> tokendings: POST app jwks to /registration/client
 note right: jwks/key-id/accessPolicy json
 jwker -> cluster: create secret
 note left: jwks with private jwk
+cluster -> application: inject new secret
 
 ==Call another application==
 enduser -> application: fetch resource
@@ -36,12 +39,13 @@ enduser -> application: user-jwt
 application -> tokendings: present client-jwt, signed with jwk
 note right: client-jwt: {sub:app-id(clustername.namespace.appname), audience:tokendings}
 application -> tokendings: client-assertion: client-jwt, subject-token: user-jwt
-tokendings <- bucket: jwks matching sub:app-id in jwt
+tokendings <- db: jwks matching sub:app-id in jwt
 tokendings -> tokendings: validate jwt using jwks
-tokendings <- bucket: fetch accessPolicy matching sub:app-id in jwt
+tokendings <- db: fetch accessPolicy matching sub:app-id in jwt
 tokendings -> tokendings: evaluate accessPolicies
 tokendings -> idprovider: fetch jwks (public keys)
 tokendings -> tokendings: validate subject:token
+tokendings -> db: persist jwks and accessPolicy
 tokendings -> application: return valid token
 application -> anotherapplication: present token
 
