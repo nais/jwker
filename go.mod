@@ -4,8 +4,10 @@ go 1.13
 
 require (
 	cloud.google.com/go v0.38.0
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-chi/chi v4.1.0+incompatible
 	github.com/go-logr/logr v0.1.0
+	github.com/google/martian v2.1.0+incompatible
 	github.com/google/uuid v1.1.1
 	github.com/mitchellh/hashstructure v1.0.0
 	github.com/onsi/ginkgo v1.11.0

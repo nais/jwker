@@ -17,6 +17,9 @@ all: manager
 test: generate fmt vet manifests
 	go test ./... -coverprofile cover.out
 
+integration_test:
+	go test ./pkg/tokendings/gettoken_test.go -tags=integration -v -count=1
+
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager main.go
