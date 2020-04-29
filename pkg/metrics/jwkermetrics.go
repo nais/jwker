@@ -4,7 +4,6 @@ import (
 	"context"
 
 	jwkerv1 "github.com/nais/jwker/api/v1"
-	"github.com/nais/jwker/pkg/storage"
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,12 +15,6 @@ var (
 		prometheus.GaugeOpts{
 			Name: "jwker_total",
 		})
-	JwkerBucketObjects = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name: "jwker_bucket_objects",
-			Help: "Number of jwkers in bucket",
-		},
-	)
 	JwkersProcessedCount = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "jwker_processed_count",
@@ -54,14 +47,5 @@ func SetTotalJwkerSecrets(cli client.Client) error {
 		return err
 	}
 	JwkerSecretsTotal.Set(float64(len(secretList.Items)))
-	return nil
-}
-
-func UpdateBucketMetric(storage storage.JwkerStorage) error {
-	count, err := storage.Count()
-	if err != nil {
-		return err
-	}
-	JwkerBucketObjects.Set(float64(count))
 	return nil
 }

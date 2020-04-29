@@ -46,9 +46,9 @@ func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.Cli
 	}
 
 	// if err := cli.Get(ctx, client.ObjectKey{Namespace: app.Namespace, Name: secretName}, secretSpec.DeepCopyObject()); err != nil {
-	//if !errors.IsNotFound(err) {
+	// if !errors.IsNotFound(err) {
 	//	return fmt.Errorf("Unable to fetch secret: %s", err)
-	//}
+	// }
 	if err := cli.Create(ctx, secretSpec.DeepCopyObject()); err != nil {
 		return fmt.Errorf("Unable to apply secretSpec: %s", err)
 	}
@@ -61,7 +61,7 @@ func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.Cli
 
 // TODO: Make exclusion optional
 func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string) error {
-	secretList, err := fetchClusterSecrets(app.Name, app.Namespace, cli)
+	secretList, err := ClusterSecrets(ctx, app, cli)
 	if err != nil {
 		return err
 	}
@@ -76,13 +76,13 @@ func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings
 	return nil
 }
 
-func fetchClusterSecrets(app, namespace string, cli client.Client) (corev1.SecretList, error) {
+func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Client) (corev1.SecretList, error) {
 	var secrets corev1.SecretList
 	var mLabels = client.MatchingLabels{}
 
-	mLabels["app"] = app
+	mLabels["app"] = app.Name
 	mLabels["type"] = "jwker.nais.io"
-	if err := cli.List(context.Background(), &secrets, client.InNamespace(namespace), mLabels); err != nil {
+	if err := cli.List(ctx, &secrets, client.InNamespace(app.Namespace), mLabels); err != nil {
 		return secrets, err
 	}
 	return secrets, nil

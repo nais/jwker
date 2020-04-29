@@ -1,15 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"net/http"
 	"os"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-	"github.com/nais/jwker/pkg/storage"
-	"github.com/nais/jwker/utils"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -35,7 +29,6 @@ func init() {
 		jwkermetrics.JwkersTotal,
 		jwkermetrics.JwkersProcessedCount,
 		jwkermetrics.JwkerSecretsTotal,
-		jwkermetrics.JwkerBucketObjects,
 	)
 
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -45,22 +38,17 @@ func init() {
 }
 
 func main() {
+	var tenantID string
 	var metricsAddr string
 	var clusterName string
-	var storagePath string
 	var tokenDingsUrl string
-	var storageBucket string
-	var credentialsPath string
-	var port string
+	var tokenDingsClientId string
 
-	// TODO: run these on same port
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
-	flag.StringVar(&port, "port", "8080", "The address the .well-know endpoints is served on.")
 	flag.StringVar(&clusterName, "clustername", "cluster_name_not_set", "Name of runtime cluster")
-	flag.StringVar(&storagePath, "storagepath", "storage.json", "path to storage object")
+	flag.StringVar(&tenantID, "tenantID", "common", "azure tenant id")
+	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", "tokendings-dev-gcp", "ClientID of tokendings")
 	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", "http://localhost:8080", "URL to tokendings")
-	flag.StringVar(&storageBucket, "storageBucket", "jwker-dev", "Bucket name")
-	flag.StringVar(&credentialsPath, "credentialsPath", "./sa-credentials.json", "path to sa-credentials.json")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -75,44 +63,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// lag transaksjon av rotation
-	// cache privatnøkkel i k8s-secret
-	privateJwks, publicJwks, err := utils.GenerateJwkerKeys()
-	if err != nil {
-		setupLog.Error(err, "Unable to generate jwks")
-	}
-
-	if _, err := os.Stat(credentialsPath); err != nil {
-		setupLog.Error(err, "Credentials file is missing. Exiting...\n")
-		os.Exit(1)
-	}
-	jwkerStorage, err := storage.New(credentialsPath, storageBucket)
-	if err != nil {
-		setupLog.Error(err, "Unable to instantiate jwkerStorage")
-	}
 	if err = (&controllers.JwkerReconciler{
-		Client:           mgr.GetClient(),
-		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Scheme:           mgr.GetScheme(),
-		ClusterName:      clusterName,
-		StoragePath:      storagePath,
-		JwkerPrivateJwks: &privateJwks,
-		TokenDingsUrl:    tokenDingsUrl,
-		JwkerStorage:     jwkerStorage,
+		Client:        mgr.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Scheme:        mgr.GetScheme(),
+		ClusterName:   clusterName,
+		TokenDingsUrl: tokenDingsUrl,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
-	res, err := json.MarshalIndent(publicJwks, "", " ")
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-
-	r.Get("/jwks", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(res)
-	})
-	go http.ListenAndServe(":"+port, r)
 	metrics.Registry.MustRegister()
 
 	setupLog.Info("starting manager")

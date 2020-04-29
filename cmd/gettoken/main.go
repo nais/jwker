@@ -167,7 +167,5 @@ func applicationToken(params newTokenParams) (*tokendings.TokenResponse, error) 
 		return nil, err
 	}
 
-	token.Created = time.Now().Unix()
-
 	return token, nil
 }

@@ -7,12 +7,13 @@ import (
 
 	"github.com/go-logr/logr"
 	jwkerv1 "github.com/nais/jwker/api/v1"
+	"github.com/nais/jwker/pkg/deployment"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/secret"
-	"github.com/nais/jwker/pkg/storage"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	"gopkg.in/square/go-jose.v2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -22,19 +23,16 @@ import (
 // JwkerReconciler reconciles a Jwker object
 type JwkerReconciler struct {
 	client.Client
-	Log              logr.Logger
-	Scheme           *runtime.Scheme
-	ClusterName      string
-	StoragePath      string
-	JwkerPrivateJwks *jose.JSONWebKeySet
-	TokenDingsUrl    string
-	logger           logr.Logger
-	JwkerStorage     storage.JwkerStorage
-	TokendingsToken  *tokendings.TokenResponse
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	ClusterName     string
+	TenantID        string
+	TokenDingsUrl   string
+	logger          logr.Logger
+	TokendingsToken *tokendings.TokenResponse
 }
 
 func (r *JwkerReconciler) privateKey() *jose.JSONWebKey {
-	return &r.JwkerPrivateJwks.Keys[0]
 }
 
 func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
@@ -54,14 +52,15 @@ func (r *JwkerReconciler) refreshToken() {
 
 		// Fetching a token for communicating with tokendings
 		jwkerClientID := tokendings.ClientId{Name: "jwker", Namespace: "nais", Cluster: r.ClusterName}
-		r.TokendingsToken, err = tokendings.GetToken(r.privateKey(), jwkerClientID, r.TokenDingsUrl)
+		r.TokendingsToken, err = tokendings.GetToken(r.privateKey(), jwkerClientID, r.TokenDingsUrl, r.TenantID)
 		if err != nil {
-			r.logger.Error(err, "unable to fetch jwker-token from tokendings. will retry in 10 secs.")
+			r.logger.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
+			exp = 10 * time.Second
 		} else {
 			secs := float64(r.TokendingsToken.ExpiresIn) / 3
 			exp = time.Duration(int(secs)) * time.Second
-			t.Reset(exp)
 		}
+		t.Reset(exp)
 	}
 }
 
@@ -86,22 +85,28 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 	}
 	jwkermetrics.JwkerSecretsTotal.Dec()
 
-	r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from storage bucket", req.Name, req.Namespace))
-	// TODO: pass context
-	if err := r.JwkerStorage.Delete(aid.ToFileName()); err != nil {
-		return fmt.Errorf("deleting application from storage bucket: %s", err)
-	}
-	if err := jwkermetrics.UpdateBucketMetric(r.JwkerStorage); err != nil {
-		return err
-	}
-
 	return client.IgnoreNotFound(err)
 }
 
-func (r *JwkerReconciler) prepareJwks(ctx context.Context, req ctrl.Request) (utils.KeySet, error) {
-	appClientId := r.appClientID(req)
+func (r *JwkerReconciler) prepareJwks(ctx context.Context, req ctrl.Request) (*utils.KeySet, error) {
+	gc := &v1.SecretList{
+		Items: make([]v1.Secret, 0),
+	}
 
-	existingJwk, keyIds, err := r.JwkerStorage.Read(appClientId.ToFileName())
+	app := r.appClientID(req)
+
+	deploy, err := deployment.Deployment(ctx, app, r)
+	if err != nil {
+		return nil, err
+	}
+
+	secrets, err := secret.ClusterSecrets(ctx, app, r.Client)
+	if err != nil {
+		return nil, err
+	}
+	r.Delete(ctx, gc)
+
+	existingJwk, keyIds, err := r.JwkerStorage.Read(app.ToFileName())
 	if err != nil {
 		if err.Error() != "storage: object doesn't exist" {
 			return ctrl.Result{}, err
@@ -115,8 +120,7 @@ func (r *JwkerReconciler) prepareJwks(ctx context.Context, req ctrl.Request) (ut
 		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
-	clientPrivateJwks, clientPublicJwks:= utils.JwksWithExistingPublicKey(clientJwk, existingJwk)
-
+	clientPrivateJwks, clientPublicJwks := utils.JwksWithExistingPublicKey(clientJwk, existingJwk)
 
 }
 
@@ -160,9 +164,6 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	hash := ""
 	var j jwkerv1.Jwker
 	jwkermetrics.JwkersProcessedCount.Inc()
-	if err := jwkermetrics.UpdateBucketMetric(r.JwkerStorage); err != nil {
-		return ctrl.Result{}, err
-	}
 	if err := jwkermetrics.SetTotalJwkersMetric(r); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -208,7 +209,6 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if j.Status.SynchronizationHash == hash && j.Status.SynchronizationState == jwkerv1.EventRolloutComplete {
 		return ctrl.Result{}, nil
 	}
-
 
 	j.Status = j.Status.Successful(hash)
 	changed = true
