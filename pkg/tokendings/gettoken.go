@@ -61,7 +61,7 @@ func OauthForm(scope, clientAssertion string) url.Values {
 }
 
 // scope = api://tokendings.prod
-func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID string, scope, tenantID string) (*TokenResponse, error) {
+func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, tenantID string) (*TokenResponse, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
 
 	signerOpts := jose.SignerOptions{}
@@ -74,7 +74,7 @@ func GetToken(privateJwk *jose.JSONWebKey, jwkerClientID string, scope, tenantID
 	}
 
 	endpoint := microsoft.AzureADEndpoint(tenantID).TokenURL
-	claims := Claims(jwkerClientID, endpoint)
+	claims := Claims(clientID, endpoint)
 
 	builder := jwt.Signed(rsaSigner).Claims(claims)
 	rawJWT, err := builder.CompactSerialize()

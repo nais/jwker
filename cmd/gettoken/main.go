@@ -73,11 +73,11 @@ func main() {
 }
 
 const (
-	tokenDingsTokenEndpoint  = "%s/token"
-	mockGrantType            = "client_credentials"
-	clientAssertionType      = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-	grantType                = "urn:ietf:params:oauth:grant-type:token-exchange"
-	subjectTokenType         = "urn:ietf:params:oauth:token-type:jwt"
+	tokenDingsTokenEndpoint = "%s/token"
+	mockGrantType           = "client_credentials"
+	clientAssertionType     = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+	grantType               = "urn:ietf:params:oauth:grant-type:token-exchange"
+	subjectTokenType        = "urn:ietf:params:oauth:token-type:jwt"
 )
 
 func mocktoken(clientid string) (*tokendings.TokenResponse, error) {
