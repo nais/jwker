@@ -28,16 +28,26 @@ const (
 	clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
 
-func Claims(clientid string, audience string) jwt.Claims {
+type CustomClaims struct {
+	Issuer    string          `json:"iss,omitempty"`
+	Subject   string          `json:"sub,omitempty"`
+	Expiry    jwt.NumericDate `json:"exp,omitempty"`
+	NotBefore jwt.NumericDate `json:"nbf,omitempty"`
+	IssuedAt  jwt.NumericDate `json:"iat,omitempty"`
+	ID        string          `json:"jti,omitempty"`
+	Audience  string          `json:"aud,omitempty"`
+}
+
+func Claims(clientid, audience string) CustomClaims {
 	now := time.Now()
 
-	return jwt.Claims{
+	return CustomClaims{
 		Issuer:    clientid,
 		Subject:   clientid,
-		Audience:  []string{audience},
 		Expiry:    jwt.NewNumericDate(now.Add(time.Second * 50000000)),
 		NotBefore: 1,
 		ID:        utils.RandStringBytes(8),
+		Audience:  audience,
 	}
 }
 
