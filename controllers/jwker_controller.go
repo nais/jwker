@@ -162,11 +162,6 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*trans
 		return nil, fmt.Errorf("deployment has %d references to jwker secrets, expecting exactly 1", used)
 	}
 
-	/*	err = r.Delete(ctx, &secrets.Unused)
-		if err != nil {
-			return nil, err
-		}
-	*/
 	newJwk, err := utils.GenerateJWK()
 	if err != nil {
 		return nil, err
@@ -204,13 +199,20 @@ func (r *JwkerReconciler) create(tr transaction) error {
 		app,
 		tr.jwker,
 	)
-	if err != nil {
+
+	// FIXME: tokendings doesn't work as advertised yet
+	if false && err != nil {
 		return fmt.Errorf("failed registering client: %s", err)
 	}
 
 	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Namespace, app.Name))
 	if err := secret.ReconcileSecrets(r, tr.ctx, app, tr.jwker.Spec.SecretName, tr.keyset.Private); err != nil {
 		return fmt.Errorf("reconciling secrets: %s", err)
+	}
+
+	err = r.Delete(tr.ctx, &tr.secretLists.Unused)
+	if err != nil {
+		return fmt.Errorf("delete old secrets: %s", err)
 	}
 
 	return nil
