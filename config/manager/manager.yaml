@@ -24,9 +24,12 @@ spec:
     spec:
       containers:
       - command:
-        - /manager
+        - /jwker
         args:
-        - --enable-leader-election
+        - --clustername=the_best_cluster
+        - --storageBucket=jwker-test
+        - --port=8081
+        - --credentialsPath=/var/run/secret/sa-credentials.json
         image: controller:latest
         name: manager
         resources:
@@ -36,4 +39,12 @@ spec:
           requests:
             cpu: 100m
             memory: 20Mi
+        volumeMounts:
+        - mountPath: /var/run/secret
+          name: jwker-sa
+          readOnly: true
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: jwker-sa
+        secret:
+          secretName: jwker-sa
