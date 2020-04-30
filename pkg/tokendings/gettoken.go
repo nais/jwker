@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nais/jwker/utils"
-	"golang.org/x/oauth2/microsoft"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -61,7 +60,7 @@ func OauthForm(scope, clientAssertion string) url.Values {
 }
 
 // scope = api://tokendings.prod
-func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, tenantID string) (*TokenResponse, error) {
+func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, endpoint string) (*TokenResponse, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
 
 	signerOpts := jose.SignerOptions{}
@@ -73,7 +72,6 @@ func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, tenantID stri
 		return nil, err
 	}
 
-	endpoint := microsoft.AzureADEndpoint(tenantID).TokenURL
 	claims := Claims(clientID, endpoint)
 
 	builder := jwt.Signed(rsaSigner).Claims(claims)

@@ -56,7 +56,7 @@ func loadCredentials(path string) (*jose.JSONWebKey, error) {
 
 func main() {
 	var clientID string
-	var tenantID string
+	var authProviderURL string
 	var metricsAddr string
 	var clusterName string
 	var tokenDingsUrl string
@@ -67,7 +67,7 @@ func main() {
 	flag.StringVar(&clientID, "clientID", "I DIDNT CONFIGURE AZURE CLIENT ID", "azure client id")
 	flag.StringVar(&clusterName, "clustername", "cluster_name_not_set", "Name of runtime cluster")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
-	flag.StringVar(&tenantID, "tenantID", "common", "azure tenant id")
+	flag.StringVar(&authProviderURL, "authProviderURL", "common", "")
 	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", "tokendings-dev-gcp", "ClientID of tokendings")
 	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", "http://localhost:8080", "URL to tokendings")
 	flag.Parse()
@@ -97,7 +97,7 @@ func main() {
 		ClusterName:        clusterName,
 		Log:                ctrl.Log.WithName("controllers").WithName("Jwker"),
 		Scheme:             mgr.GetScheme(),
-		TenantID:           tenantID,
+		Endpoint:           authProviderURL,
 		TokenDingsUrl:      tokenDingsUrl,
 		TokendingsClientID: tokenDingsClientId,
 	}
