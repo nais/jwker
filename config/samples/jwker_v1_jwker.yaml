@@ -8,18 +8,86 @@ metadata:
 apiVersion: jwker.nais.io/v1
 kind: Jwker
 metadata:
-  name: jwker-sample-next-1
+  name: app1
   namespace: test
 spec:
-  secretName: jwker-sample-1223lllkj
+  secretName: app1
   accessPolicy:
     inbound:
       rules:
-        - application: app-a
-          namespace: anothernamespace
-          cluster: anothercluster
+        - application: app2
     outbound:
       rules:
-        - application: foo
-          namespace: bar
-          cluster: danser
+        - application: app2
+
+---
+apiVersion: jwker.nais.io/v1
+kind: Jwker
+metadata:
+  name: app2
+  namespace: test
+spec:
+  secretName: app2
+  accessPolicy:
+    inbound:
+      rules:
+        - application: app1
+    outbound:
+      rules:
+        - application: app1
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: app1
+  name: app1
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: app1
+  template:
+    metadata:
+      labels:
+        app: app1
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+      volumes:
+      - name: app1-jwker-secret
+        secret:
+          defaultMode: 420
+          secretName: app1
+      - name: untouchable
+        secret:
+          defaultMode: 420
+          secretName: untouchable
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: app2
+  name: app2
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: app2
+  template:
+    metadata:
+      labels:
+        app: app2
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+      volumes:
+      - name: app2-jwker-secret
+        secret:
+          defaultMode: 420
+          secretName: app2

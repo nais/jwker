@@ -17,7 +17,7 @@ import (
 var (
 	clientid = os.Getenv("CLIENT_ID")
 	scope    = os.Getenv("SCOPE")
-	tenantID = os.Getenv("TENANT_ID")
+	endpoint = os.Getenv("AUTH_PROVIDER_URL")
 )
 
 // Retrieve a valid token from Azure, and verify that it can be used with the correct audience.
@@ -37,7 +37,7 @@ func TestGetToken(t *testing.T) {
 		panic(err)
 	}
 
-	token, err := tokendings.GetToken(jwk, clientid, scope, tenantID)
+	token, err := tokendings.GetToken(jwk, clientid, scope, endpoint)
 
 	assert.NoError(t, err)
 

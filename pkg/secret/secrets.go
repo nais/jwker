@@ -8,6 +8,7 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -48,7 +49,12 @@ func CreateSecret(cli client.Client, ctx context.Context, app tokendings.ClientI
 		return fmt.Errorf("Unable to create secretSpec object: %s", err)
 	}
 
-	if err := cli.Create(ctx, secretSpec.DeepCopyObject()); err != nil {
+	err = cli.Create(ctx, &secretSpec)
+	if errors.IsAlreadyExists(err) {
+		err = cli.Update(ctx, &secretSpec)
+	}
+
+	if err != nil {
 		return fmt.Errorf("Unable to apply secretSpec: %s", err)
 	}
 

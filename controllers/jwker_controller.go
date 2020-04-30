@@ -13,6 +13,7 @@ import (
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +25,7 @@ import (
 
 const (
 	refreshTokenRetryInterval = 10 * time.Second
+	requeueInterval           = 10 * time.Second
 )
 
 // JwkerReconciler reconciles a Jwker object
@@ -33,7 +35,7 @@ type JwkerReconciler struct {
 	Scheme             *runtime.Scheme
 	ClusterName        string
 	ClientID           string
-	TenantID           string
+	Endpoint           string
 	TokendingsClientID string
 	TokenDingsUrl      string
 	logger             logr.Logger
@@ -64,13 +66,14 @@ func (r *JwkerReconciler) RefreshToken() {
 	for range t.C {
 
 		// Fetching a token for communicating with tokendings
-		r.TokendingsToken, err = tokendings.GetToken(&r.AzureCredentials, r.ClientID, sc, r.TenantID)
+		r.TokendingsToken, err = tokendings.GetToken(&r.AzureCredentials, r.ClientID, sc, r.Endpoint)
 		if err != nil {
 			r.Log.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
 			exp = refreshTokenRetryInterval
 		} else {
 			secs := float64(r.TokendingsToken.ExpiresIn) / 3
 			exp = time.Duration(int(secs)) * time.Second
+			log.Infof("got token from Azure, next refresh in %s", exp)
 		}
 		t.Reset(exp)
 	}
@@ -79,15 +82,12 @@ func (r *JwkerReconciler) RefreshToken() {
 // delete all associated objects
 // TODO: needs finalizer
 func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
-
-	var err error
-
 	aid := r.appClientID(req)
 
 	r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
 
 	r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from tokendings", req.Name, req.Namespace))
-	if err = tokendings.DeleteClient(ctx, r.TokendingsToken.AccessToken, r.TokenDingsUrl, aid); err != nil {
+	if err := tokendings.DeleteClient(ctx, r.TokendingsToken.AccessToken, r.TokenDingsUrl, aid); err != nil {
 		return fmt.Errorf("deleting resource from Tokendings: %s", err)
 	}
 
@@ -97,7 +97,7 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 	}
 	jwkermetrics.JwkerSecretsTotal.Dec()
 
-	return client.IgnoreNotFound(err)
+	return nil
 }
 
 type secretLists struct {
@@ -158,8 +158,8 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*trans
 	secrets := secretsInDeployment(allSecrets, *deploy)
 
 	used := len(secrets.Used.Items)
-	if used != 1 {
-		return nil, fmt.Errorf("deployment has %d references to jwker secrets, expecting exactly 1", used)
+	if used > 1 {
+		return nil, fmt.Errorf("deployment has %d references to jwker secrets, expecting at most 1", used)
 	}
 
 	newJwk, err := utils.GenerateJWK()
@@ -167,16 +167,23 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*trans
 		return nil, err
 	}
 
-	jwks, err := secret.ExtractJWKS(secrets.Used.Items[0])
-	if err != nil {
-		return nil, err
-	}
+	jwks := jose.JSONWebKeySet{}
+	keyset := utils.KeySet{}
 
-	if len(jwks.Keys) != 1 {
-		return nil, fmt.Errorf("secret has %d keys, expecting exactly 1", used)
-	}
+	if used == 0 {
+		keyset = utils.KeySetWithoutExisting(newJwk)
+	} else {
+		jwks, err = secret.ExtractJWKS(secrets.Used.Items[0])
+		if err != nil {
+			return nil, err
+		}
 
-	keyset := utils.BuildKeySet(newJwk, jwks.Keys[0])
+		if len(jwks.Keys) != 1 {
+			return nil, fmt.Errorf("secret has %d keys, expecting exactly 1", used)
+		}
+
+		keyset = utils.KeySetWithExisting(newJwk, jwks.Keys[0])
+	}
 
 	return &transaction{
 		ctx:         ctx,
@@ -200,12 +207,11 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		tx.jwker,
 	)
 
-	// FIXME: tokendings doesn't work as advertised yet
-	if false && err != nil {
+	if err != nil {
 		return fmt.Errorf("failed registering client: %s", err)
 	}
 
-	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Namespace, app.Name))
+	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Name, app.Namespace))
 	if err := secret.CreateSecret(r, tx.ctx, app, tx.jwker.Spec.SecretName, tx.keyset.Private); err != nil {
 		return fmt.Errorf("reconciling secrets: %s", err)
 	}
@@ -232,7 +238,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	if r.TokendingsToken == nil {
 		return ctrl.Result{
-			RequeueAfter: time.Second * 10,
+			RequeueAfter: requeueInterval,
 		}, nil
 	}
 
@@ -244,12 +250,13 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	case errors.IsNotFound(err):
 		err := r.purge(ctx, req)
 		if err != nil {
-			r.logger.Error(err, "failed purge")
+			err = fmt.Errorf("failed purge: %s", err)
 		}
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, err
+
 	case err != nil:
 		return ctrl.Result{
-			RequeueAfter: time.Second * 10,
+			RequeueAfter: requeueInterval,
 		}, nil
 	}
 
@@ -257,15 +264,17 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if jwker.Status.SynchronizationHash == hash && jwker.Status.SynchronizationState == jwkerv1.EventRolloutComplete {
+	if jwker.Status.SynchronizationHash == hash {
 		return ctrl.Result{}, nil
 	}
 
 	// Update Jwker resource with status event
 	defer func() {
 		jwker.Status.SynchronizationTime = time.Now().UnixNano()
-		jwker.Status.SynchronizationHash = hash
-		r.Update(ctx, &jwker)
+		err := r.Update(ctx, &jwker)
+		if err != nil {
+			r.logger.Error(err, "failed writing status")
+		}
 	}()
 
 	// prepare and commit
@@ -274,7 +283,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		jwker.Status.SynchronizationState = jwkerv1.EventFailedPrepare
 		r.logger.Error(err, "failed prepare jwks")
 		return ctrl.Result{
-			RequeueAfter: time.Second * 10,
+			RequeueAfter: requeueInterval,
 		}, nil
 	}
 
@@ -284,16 +293,17 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		jwker.Status.SynchronizationState = jwkerv1.EventFailedSynchronization
 		r.logger.Error(err, "failed synchronization")
 		return ctrl.Result{
-			RequeueAfter: time.Second * 10,
+			RequeueAfter: requeueInterval,
 		}, nil
 	}
 
 	jwker.Status.SynchronizationState = jwkerv1.EventRolloutComplete
+	jwker.Status.SynchronizationHash = hash
 
 	// delete unused secrets from cluster
-	err = r.Delete(tx.ctx, &tx.secretLists.Unused)
-	if err != nil {
-		return ctrl.Result{}, err
+	for _, oldSecret := range tx.secretLists.Unused.Items {
+		err = r.Delete(tx.ctx, &oldSecret)
+		r.logger.Error(err, "failed deletion")
 	}
 
 	return ctrl.Result{}, nil
