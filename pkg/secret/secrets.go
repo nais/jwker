@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/tokendings"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -43,27 +42,16 @@ func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJ
 	}, nil
 }
 
-func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
-	if err := DeleteClusterSecrets(cli, ctx, app, secretName); err != nil {
-		return fmt.Errorf("Unable to delete clusterSecrets from cluster: %s", err)
-	}
-
+func CreateSecret(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
 	secretSpec, err := CreateSecretSpec(app, secretName, clientPrivateJwks)
 	if err != nil {
 		return fmt.Errorf("Unable to create secretSpec object: %s", err)
 	}
 
-	// if err := cli.Get(ctx, client.ObjectKey{Namespace: app.Namespace, Name: secretName}, secretSpec.DeepCopyObject()); err != nil {
-	// if !errors.IsNotFound(err) {
-	//	return fmt.Errorf("Unable to fetch secret: %s", err)
-	// }
 	if err := cli.Create(ctx, secretSpec.DeepCopyObject()); err != nil {
 		return fmt.Errorf("Unable to apply secretSpec: %s", err)
 	}
-	// }
-	if err := jwkermetrics.SetTotalJwkerSecrets(cli); err != nil {
-		return err
-	}
+
 	return nil
 }
 
