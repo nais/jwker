@@ -64,12 +64,12 @@ func main() {
 	var azureJWKFile string
 
 	flag.StringVar(&azureJWKFile, "azureJWKFile", "/var/run/secrets/azure/jwk.json", "file with JWK credential for Azure")
-	flag.StringVar(&clientID, "clientID", "I DIDNT CONFIGURE AZURE CLIENT ID", "azure client id")
-	flag.StringVar(&clusterName, "clustername", "cluster_name_not_set", "Name of runtime cluster")
+	flag.StringVar(&clientID, "clientID", os.Getenv("JWKER_CLIENT_ID"), "azure client id")
+	flag.StringVar(&clusterName, "clustername", os.Getenv("CLUSTER_NAME"), "Name of runtime cluster")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
-	flag.StringVar(&authProviderURL, "authProviderURL", "common", "")
-	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", "tokendings-dev-gcp", "ClientID of tokendings")
-	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", "http://localhost:8080", "URL to tokendings")
+	flag.StringVar(&authProviderURL, "authProviderURL", os.Getenv("AUTH_PROVIDER_URL"), "")
+	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", os.Getenv("TOKENDINGS_CLIENT_ID"), "ClientID of tokendings")
+	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", os.Getenv("TOKENDINGS_URL"), "URL to tokendings")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
