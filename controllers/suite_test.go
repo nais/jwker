@@ -43,7 +43,7 @@ const namespace = "default"
 
 type handler struct{}
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *handler) serveRegistration(w http.ResponseWriter, r *http.Request) {
 	statement := &tokendings.ClientRegistration{}
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(statement)
@@ -52,6 +52,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *handler) serveDelete(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		h.serveRegistration(w, r)
+	} else if r.Method == http.MethodDelete {
+		h.serveDelete(w, r)
+	}
 }
 
 func fixtures(cli client.Client) error {
@@ -261,6 +273,24 @@ func TestReconciler(t *testing.T) {
 	sec, err = getSecret(ctx, cli, namespace, expiredSecret)
 	assert.True(t, errors.IsNotFound(err))
 
+	// remove the jwker resource; usually done when naiserator syncs
+	jwk := &jwkerv1.Jwker{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "Jwker",
+			APIVersion: "v1",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      appName,
+			Namespace: namespace,
+		},
+	}
+	err = cli.Delete(ctx, jwk)
+	assert.NoError(t, err)
+
+	// test that deleting the jwker resource purges associated secrets
+	assert.NoError(t, waitForDeletedSecret(ctx, cli, namespace, secretName))
+	assert.NoError(t, waitForDeletedSecret(ctx, cli, namespace, alreadyInUseSecret))
+
 	err = testEnv.Stop()
 	assert.NoError(t, err)
 }
@@ -295,6 +325,30 @@ func getSecretWithTimeout(ctx context.Context, cli client.Client, namespace, nam
 			}
 			if !errors.IsNotFound(err) {
 				return nil, err
+			}
+		}
+	}
+}
+
+func waitForDeletedSecret(ctx context.Context, cli client.Client, namespace, name string) error {
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}
+	sec := &corev1.Secret{}
+	timeout := time.NewTimer(5 * time.Second)
+	ticker := time.NewTicker(250 * time.Millisecond)
+
+	for {
+		select {
+		case <-timeout.C:
+			return fmt.Errorf("secret still exists")
+		case <-ticker.C:
+			err := cli.Get(ctx, key, sec)
+			if errors.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				return err
 			}
 		}
 	}
