@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -12,9 +13,11 @@ import (
 	"github.com/nais/jwker/controllers"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/nais/jwker/utils"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -56,6 +59,7 @@ func fixtures(t *testing.T, cli client.Client) {
 			Spec: jwkerv1.JwkerSpec{
 				SecretName: secretName,
 				AccessPolicy: &jwkerv1.AccessPolicy{
+					Inbound: &jwkerv1.AccessPolicyInbound{},
 				},
 			},
 		},
@@ -131,19 +135,23 @@ func TestReconciler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, cli)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(testEnv.Config, ctrl.Options{
 		Scheme:             scheme.Scheme,
 		MetricsBindAddress: "0",
 	})
 	assert.NoError(t, err)
 
+	signkey, err := utils.GenerateJWK()
+	assert.NoError(t, err)
+
 	jwker := &controllers.JwkerReconciler{
-		Client:          cli,
-		ClusterName:     "local",
-		Log:             ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Scheme:          mgr.GetScheme(),
-		TokenDingsUrl:   "http://" + listener.Addr().String(),
-		TokendingsToken: &tokendings.TokenResponse{},
+		AzureCredentials: signkey,
+		Client:           cli,
+		ClusterName:      "local",
+		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Scheme:           mgr.GetScheme(),
+		TokenDingsUrl:    "http://" + listener.Addr().String(),
+		TokendingsToken:  &tokendings.TokenResponse{},
 	}
 
 	err = jwker.SetupWithManager(mgr)
@@ -159,21 +167,39 @@ func TestReconciler(t *testing.T) {
 	// insert data into the cluster
 	fixtures(t, cli)
 
-	// wait for reconciliation
-	time.Sleep(1 * time.Second)
-
-	// check that secret has been synced
-	key := client.ObjectKey{
-		Namespace: namespace,
-		Name:      secretName,
-	}
-	sec := &corev1.Secret{}
-	err = cli.Get(ctx, key, sec)
+	// wait for synced secret until timeout
+	sec, err := getSecretWithTimeout(ctx, cli, namespace, secretName)
 	assert.NoError(t, err)
+	assert.NotNil(t, sec)
 
 	// secret must have data
 	assert.NotEmpty(t, sec.Data[secret.JwksSecretKey])
 
 	err = testEnv.Stop()
 	assert.NoError(t, err)
+}
+
+func getSecretWithTimeout(ctx context.Context, cli client.Client, namespace, name string) (*corev1.Secret, error) {
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}
+	sec := &corev1.Secret{}
+	timeout := time.NewTimer(3 * time.Second)
+	ticker := time.NewTicker(250 * time.Millisecond)
+
+	for {
+		select {
+		case <-timeout.C:
+			return nil, fmt.Errorf("timeout while waiting for secret synchronization")
+		case <-ticker.C:
+			err := cli.Get(ctx, key, sec)
+			if err == nil {
+				return sec, nil
+			}
+			if !errors.IsNotFound(err) {
+				return nil, err
+			}
+		}
+	}
 }

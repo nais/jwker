@@ -237,7 +237,6 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
 
-
 	// purge other systems if resource was deleted
 	err := r.Get(ctx, req.NamespacedName, &jwker)
 	switch {

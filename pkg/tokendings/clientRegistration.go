@@ -121,18 +121,25 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 	return nil
 }
 
-func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (SoftwareStatement, error) {
+func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement, error) {
 	var inbound []string
 	var outbound []string
-	for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
-		cluster, namespace := parseAccessPolicy(rule, appId)
-		inbound = append(inbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+	if jwker.Spec.AccessPolicy == nil {
+		return nil, fmt.Errorf("no access policy")
 	}
-	for _, rule := range jwker.Spec.AccessPolicy.Outbound.Rules {
-		cluster, namespace := parseAccessPolicy(rule, appId)
-		outbound = append(outbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+	if jwker.Spec.AccessPolicy.Inbound != nil {
+		for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
+			cluster, namespace := parseAccessPolicy(rule, appId)
+			inbound = append(inbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+		}
 	}
-	return SoftwareStatement{
+	if jwker.Spec.AccessPolicy.Outbound != nil {
+		for _, rule := range jwker.Spec.AccessPolicy.Outbound.Rules {
+			cluster, namespace := parseAccessPolicy(rule, appId)
+			outbound = append(outbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+		}
+	}
+	return &SoftwareStatement{
 		AppId:                appId.String(),
 		AccessPolicyInbound:  inbound,
 		AccessPolicyOutbound: outbound,
