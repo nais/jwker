@@ -37,6 +37,8 @@ type JwkerStatus struct {
 	SynchronizationHash  string `json:"synchronizationHash,omitempty"`
 }
 
+// +genclient
+// +kubebuilder:printcolumn:name="Secret",type="string",JSONPath=".spec.secretName"
 // +kubebuilder:object:root=true
 
 // Jwker is the Schema for the jwkers API
