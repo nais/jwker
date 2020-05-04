@@ -2,9 +2,11 @@ package metrics
 
 import (
 	"context"
+	"time"
 
 	jwkerv1 "github.com/nais/jwker/api/v1"
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -31,21 +33,26 @@ var (
 	ctx = context.Background()
 )
 
-func SetTotalJwkersMetric(cli client.Client) error {
-	var jwkerList jwkerv1.JwkerList
-	if err := cli.List(ctx, &jwkerList); err != nil {
-		return err
-	}
-	JwkersTotal.Set(float64(len(jwkerList.Items)))
-	return nil
-}
-func SetTotalJwkerSecrets(cli client.Client) error {
+func RefreshTotalJwkerClusterMetrics(cli client.Client) error {
+	var err error
+	exp := 10 * time.Second
+
 	var secretList v1.SecretList
 	var mLabels = client.MatchingLabels{}
 	mLabels["type"] = "jwker.nais.io"
-	if err := cli.List(ctx, &secretList, mLabels); err != nil {
-		return err
+	var jwkerList jwkerv1.JwkerList
+
+	t := time.NewTicker(exp)
+	for range t.C {
+		log.Info("Fetching metrics from cluster")
+		if err = cli.List(ctx, &secretList, mLabels); err != nil {
+			return err
+		}
+		JwkerSecretsTotal.Set(float64(len(secretList.Items)))
+		if err = cli.List(ctx, &jwkerList); err != nil {
+			return err
+		}
+		JwkersTotal.Set(float64(len(jwkerList.Items)))
 	}
-	JwkerSecretsTotal.Set(float64(len(secretList.Items)))
 	return nil
 }

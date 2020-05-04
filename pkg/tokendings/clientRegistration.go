@@ -61,7 +61,7 @@ func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string,
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 
