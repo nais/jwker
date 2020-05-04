@@ -44,6 +44,13 @@ const namespace = "default"
 type handler struct{}
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	statement := &tokendings.ClientRegistration{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(statement)
+	if err != nil || len(statement.Jwks.Keys) != 2 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 }
 
