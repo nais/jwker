@@ -8,13 +8,13 @@ WORKDIR /workspace
 RUN go mod download
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o jwker main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuffix cgo -o jwker cmd/jwker/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM alpine:3
 WORKDIR /
 COPY --from=builder /workspace/jwker /jwker
-USER nonroot:nonroot
+#USER nonroot:nonroot
 
 CMD ["/jwker"]
