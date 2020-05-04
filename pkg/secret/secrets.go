@@ -13,11 +13,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const secretKey = "jwks"
+const JwksSecretKey = "jwks"
 
 func ExtractJWKS(sec corev1.Secret) (jose.JSONWebKeySet, error) {
 	jwks := jose.JSONWebKeySet{}
-	err := json.Unmarshal(sec.Data[secretKey], &jwks)
+	err := json.Unmarshal(sec.Data[JwksSecretKey], &jwks)
 	return jwks, err
 }
 
@@ -26,7 +26,7 @@ func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJ
 	if err != nil {
 		return corev1.Secret{}, err
 	}
-	stringdata := map[string]string{secretKey: string(clientPrivateJwksJson)}
+	stringdata := map[string]string{JwksSecretKey: string(clientPrivateJwksJson)}
 
 	return corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"path/filepath"
 	"testing"
+	"time"
 
 	jwkerv1 "github.com/nais/jwker/api/v1"
 	"github.com/nais/jwker/controllers"
+	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,6 +30,9 @@ var cfg *rest.Config
 var cli client.Client
 var testEnv *envtest.Environment
 
+const secretName = "app1-secret-foobar"
+const namespace = "default"
+
 type handler struct{}
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,10 +51,10 @@ func fixtures(t *testing.T, cli client.Client) {
 			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "app1",
-				Namespace: "default",
+				Namespace: namespace,
 			},
 			Spec: jwkerv1.JwkerSpec{
-				SecretName: "app1-secret-foobar",
+				SecretName: secretName,
 				AccessPolicy: &jwkerv1.AccessPolicy{
 				},
 			},
@@ -65,7 +70,7 @@ func fixtures(t *testing.T, cli client.Client) {
 			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "app1",
-				Namespace: "default",
+				Namespace: namespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
@@ -87,7 +92,7 @@ func fixtures(t *testing.T, cli client.Client) {
 								Name: "foo",
 								VolumeSource: corev1.VolumeSource{
 									Secret: &corev1.SecretVolumeSource{
-										SecretName: "app1-secret-foobar",
+										SecretName: secretName,
 									},
 								},
 							},
@@ -100,6 +105,8 @@ func fixtures(t *testing.T, cli client.Client) {
 }
 
 func TestReconciler(t *testing.T) {
+	ctx := context.Background()
+
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
 	}
@@ -139,8 +146,33 @@ func TestReconciler(t *testing.T) {
 		TokendingsToken: &tokendings.TokenResponse{},
 	}
 
+	err = jwker.SetupWithManager(mgr)
+	assert.NoError(t, err)
+
+	go func() {
+		err = mgr.Start(ctrl.SetupSignalHandler())
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	// insert data into the cluster
 	fixtures(t, cli)
-	_ = jwker
+
+	// wait for reconciliation
+	time.Sleep(1 * time.Second)
+
+	// check that secret has been synced
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretName,
+	}
+	sec := &corev1.Secret{}
+	err = cli.Get(ctx, key, sec)
+	assert.NoError(t, err)
+
+	// secret must have data
+	assert.NotEmpty(t, sec.Data[secret.JwksSecretKey])
 
 	err = testEnv.Stop()
 	assert.NoError(t, err)
