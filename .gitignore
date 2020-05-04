@@ -25,3 +25,4 @@ bin
 
 # our ignores
 *.json
+.DS_Store
