@@ -242,18 +242,22 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	switch {
 	case errors.IsNotFound(err):
 		err := r.purge(ctx, req)
-		if err != nil {
-			err = fmt.Errorf("failed purge: %s", err)
+		if err == nil {
+			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
+		r.logger.Error(err, "failed purge")
+		return ctrl.Result{
+			RequeueAfter: requeueInterval,
+		}, err
 
 	case err != nil:
+		r.logger.Error(err, "unable to get jwker resource from cluster")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
 	}
 
-	hash, err = utils.Hash(jwker.Spec)
+	hash, err = jwker.Spec.Hash()
 	if err != nil {
 		return ctrl.Result{}, err
 	}

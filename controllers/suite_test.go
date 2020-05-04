@@ -273,7 +273,7 @@ func TestReconciler(t *testing.T) {
 	sec, err = getSecret(ctx, cli, namespace, expiredSecret)
 	assert.True(t, errors.IsNotFound(err))
 
-	// remove the jwker resource; usually done when naiserator syncs
+	// retrieve the jwker resource and check that hash and status is set
 	jwk := &jwkerv1.Jwker{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Jwker",
@@ -284,6 +284,19 @@ func TestReconciler(t *testing.T) {
 			Namespace: namespace,
 		},
 	}
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      appName,
+	}
+	err = cli.Get(ctx, key, jwk)
+	assert.NoError(t, err)
+
+	hash, err := jwk.Spec.Hash()
+	assert.NoError(t, err)
+	assert.Equal(t, hash, jwk.Status.SynchronizationHash)
+	assert.Equal(t, jwkerv1.EventRolloutComplete, jwk.Status.SynchronizationState)
+
+	// remove the jwker resource; usually done when naiserator syncs
 	err = cli.Delete(ctx, jwk)
 	assert.NoError(t, err)
 
