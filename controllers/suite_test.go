@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/square/go-jose.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +35,10 @@ var cfg *rest.Config
 var cli client.Client
 var testEnv *envtest.Environment
 
+const appName = "app1"
 const secretName = "app1-secret-foobar"
+const alreadyInUseSecret = "already-in-use"
+const expiredSecret = "expired-secret"
 const namespace = "default"
 
 type handler struct{}
@@ -42,10 +47,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func fixtures(t *testing.T, cli client.Client) {
+func fixtures(cli client.Client) error {
+	var err error
+
 	ctx := context.Background()
 
-	assert.NoError(t, cli.Create(
+	err = cli.Create(
 		ctx,
 		&jwkerv1.Jwker{
 			TypeMeta: v1.TypeMeta{
@@ -53,7 +60,7 @@ func fixtures(t *testing.T, cli client.Client) {
 				APIVersion: "v1",
 			},
 			ObjectMeta: v1.ObjectMeta{
-				Name:      "app1",
+				Name:      appName,
 				Namespace: namespace,
 			},
 			Spec: jwkerv1.JwkerSpec{
@@ -63,9 +70,12 @@ func fixtures(t *testing.T, cli client.Client) {
 				},
 			},
 		},
-	))
+	)
+	if err != nil {
+		return err
+	}
 
-	assert.NoError(t, cli.Create(
+	err = cli.Create(
 		ctx,
 		&appsv1.Deployment{
 			TypeMeta: v1.TypeMeta{
@@ -73,16 +83,16 @@ func fixtures(t *testing.T, cli client.Client) {
 				APIVersion: "v1",
 			},
 			ObjectMeta: v1.ObjectMeta{
-				Name:      "app1",
+				Name:      appName,
 				Namespace: namespace,
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"app": "app1"},
+					MatchLabels: map[string]string{"app": appName},
 				},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: v1.ObjectMeta{
-						Labels: map[string]string{"app": "app1"},
+						Labels: map[string]string{"app": appName},
 					},
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -96,7 +106,7 @@ func fixtures(t *testing.T, cli client.Client) {
 								Name: "foo",
 								VolumeSource: corev1.VolumeSource{
 									Secret: &corev1.SecretVolumeSource{
-										SecretName: secretName,
+										SecretName: alreadyInUseSecret,
 									},
 								},
 							},
@@ -105,7 +115,64 @@ func fixtures(t *testing.T, cli client.Client) {
 				},
 			},
 		},
-	))
+	)
+	if err != nil {
+		return err
+	}
+
+	key, err := utils.GenerateJWK()
+	if err != nil {
+		return err
+	}
+	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key}}
+	keyBytes, err := json.Marshal(jwks)
+	if err != nil {
+		return err
+	}
+
+	err = cli.Create(
+		ctx,
+		&corev1.Secret{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: "v1",
+			},
+			ObjectMeta: v1.ObjectMeta{
+				Name:      alreadyInUseSecret,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"app":  appName,
+					"type": "jwker.nais.io",
+				},
+			},
+			StringData: map[string]string{
+				secret.JwksSecretKey: string(keyBytes),
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	err = cli.Create(
+		ctx,
+		&corev1.Secret{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: "v1",
+			},
+			ObjectMeta: v1.ObjectMeta{
+				Name:      expiredSecret,
+				Namespace: namespace,
+				Labels: map[string]string{
+					"app":  appName,
+					"type": "jwker.nais.io",
+				},
+			},
+		},
+	)
+
+	return err
 }
 
 func TestReconciler(t *testing.T) {
@@ -125,7 +192,6 @@ func TestReconciler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, cfg)
 
-	// scheme   = runtime.NewScheme()
 	err = jwkerv1.AddToScheme(scheme.Scheme)
 	assert.NoError(t, err)
 
@@ -157,15 +223,19 @@ func TestReconciler(t *testing.T) {
 	err = jwker.SetupWithManager(mgr)
 	assert.NoError(t, err)
 
+	// insert data into the cluster
+	err = fixtures(cli)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
 	go func() {
 		err = mgr.Start(ctrl.SetupSignalHandler())
 		if err != nil {
 			panic(err)
 		}
 	}()
-
-	// insert data into the cluster
-	fixtures(t, cli)
 
 	// wait for synced secret until timeout
 	sec, err := getSecretWithTimeout(ctx, cli, namespace, secretName)
@@ -175,8 +245,27 @@ func TestReconciler(t *testing.T) {
 	// secret must have data
 	assert.NotEmpty(t, sec.Data[secret.JwksSecretKey])
 
+	// existing, in-use secret should be preserved
+	sec, err = getSecret(ctx, cli, namespace, alreadyInUseSecret)
+	assert.NoError(t, err)
+	assert.NotNil(t, sec)
+
+	// expired secret should be deleted
+	sec, err = getSecret(ctx, cli, namespace, expiredSecret)
+	assert.True(t, errors.IsNotFound(err))
+
 	err = testEnv.Stop()
 	assert.NoError(t, err)
+}
+
+func getSecret(ctx context.Context, cli client.Client, namespace, name string) (*corev1.Secret, error) {
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}
+	sec := &corev1.Secret{}
+	err := cli.Get(ctx, key, sec)
+	return sec, err
 }
 
 func getSecretWithTimeout(ctx context.Context, cli client.Client, namespace, name string) (*corev1.Secret, error) {
@@ -185,7 +274,7 @@ func getSecretWithTimeout(ctx context.Context, cli client.Client, namespace, nam
 		Name:      name,
 	}
 	sec := &corev1.Secret{}
-	timeout := time.NewTimer(3 * time.Second)
+	timeout := time.NewTimer(5 * time.Second)
 	ticker := time.NewTicker(250 * time.Millisecond)
 
 	for {
