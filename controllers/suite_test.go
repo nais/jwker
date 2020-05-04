@@ -1,81 +1,147 @@
-/*
-
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package controllers
+package controllers_test
 
 import (
+	"context"
+	"net"
+	"net/http"
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	jwkerv1 "github.com/nais/jwker/api/v1"
+	"github.com/nais/jwker/controllers"
+	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // for side effects only
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	jwkerv1 "github.com/nais/jwker/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
 var cfg *rest.Config
-var k8sClient client.Client
+var cli client.Client
 var testEnv *envtest.Environment
 
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
+type handler struct{}
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusCreated)
 }
 
-var _ = BeforeSuite(func(done Done) {
-	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+func fixtures(t *testing.T, cli client.Client) {
+	ctx := context.Background()
 
-	By("bootstrapping test environment")
+	assert.NoError(t, cli.Create(
+		ctx,
+		&jwkerv1.Jwker{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "Jwker",
+				APIVersion: "v1",
+			},
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "app1",
+				Namespace: "default",
+			},
+			Spec: jwkerv1.JwkerSpec{
+				SecretName: "app1-secret-foobar",
+				AccessPolicy: &jwkerv1.AccessPolicy{
+				},
+			},
+		},
+	))
+
+	assert.NoError(t, cli.Create(
+		ctx,
+		&appsv1.Deployment{
+			TypeMeta: v1.TypeMeta{
+				Kind:       "Jwker",
+				APIVersion: "v1",
+			},
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "app1",
+				Namespace: "default",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "app1"},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: v1.ObjectMeta{
+						Labels: map[string]string{"app": "app1"},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "main",
+								Image: "foo",
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "foo",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: "app1-secret-foobar",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	))
+}
+
+func TestReconciler(t *testing.T) {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
 	}
 
-	var err error
-	cfg, err = testEnv.Start()
-	Expect(err).ToNot(HaveOccurred())
-	Expect(cfg).ToNot(BeNil())
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	assert.NoError(t, err)
+	assert.NotNil(t, listener)
+	h := &handler{}
+	go http.Serve(listener, h)
 
+	cfg, err = testEnv.Start()
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+
+	// scheme   = runtime.NewScheme()
 	err = jwkerv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	assert.NoError(t, err)
 
 	// +kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
+	cli, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	assert.NoError(t, err)
+	assert.NotNil(t, cli)
 
-	close(done)
-}, 60)
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:             scheme.Scheme,
+		MetricsBindAddress: "0",
+	})
+	assert.NoError(t, err)
 
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).ToNot(HaveOccurred())
-})
+	jwker := &controllers.JwkerReconciler{
+		Client:          cli,
+		ClusterName:     "local",
+		Log:             ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Scheme:          mgr.GetScheme(),
+		TokenDingsUrl:   "http://" + listener.Addr().String(),
+		TokendingsToken: &tokendings.TokenResponse{},
+	}
+
+	fixtures(t, cli)
+	_ = jwker
+
+	err = testEnv.Stop()
+	assert.NoError(t, err)
+}
