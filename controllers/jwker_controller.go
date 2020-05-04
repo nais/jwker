@@ -227,14 +227,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	hash := ""
 	var jwker jwkerv1.Jwker
 
-	// TODO: use less resources
 	jwkermetrics.JwkersProcessedCount.Inc()
-	if err := jwkermetrics.SetTotalJwkersMetric(r); err != nil {
-		return ctrl.Result{}, err
-	}
-	if err := jwkermetrics.SetTotalJwkerSecrets(r); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	if r.TokendingsToken == nil {
 		return ctrl.Result{
@@ -243,6 +236,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
+
 
 	// purge other systems if resource was deleted
 	err := r.Get(ctx, req.NamespacedName, &jwker)

@@ -101,14 +101,18 @@ func main() {
 		TokenDingsUrl:      tokenDingsUrl,
 		TokendingsClientID: tokenDingsClientId,
 	}
+
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
 	}
 
-	metrics.Registry.MustRegister()
 	setupLog.Info("starting token refresh goroutine")
 	go reconciler.RefreshToken()
+
+	metrics.Registry.MustRegister()
+	setupLog.Info("starting metrics refresh goroutine")
+	go jwkermetrics.RefreshTotalJwkerClusterMetrics(mgr.GetClient())
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
