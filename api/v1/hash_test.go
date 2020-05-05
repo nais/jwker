@@ -1,5 +1,3 @@
-// +build integration
-
 package v1_test
 
 import (
