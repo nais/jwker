@@ -1,0 +1,22 @@
+name: Build and deploy jwker
+
+on: [push]
+
+env:
+  IMAGE: docker.pkg.github.com/${{ github.repository }}/jwker:${{ github.sha }}
+
+jobs:
+  build:
+    name: Checkout code and setup node
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+      - name: Build docker image
+        run: docker build . --tag $IMAGE
+      - name: Login to Github package registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login docker.pkg.github.com -u "$GITHUB_REPOSITORY" --password-stdin
+      - name: Push docker image
+        run: docker push $IMAGE
