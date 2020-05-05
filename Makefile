@@ -17,13 +17,19 @@ all: manager
 test: generate fmt vet manifests
 	go test ./... -coverprofile cover.out
 
+integration_test:
+	go test ./pkg/tokendings/gettoken_test.go -tags=integration -v -count=1
+
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/jwker main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	go run ./cmd/jwker/main.go --clustername=the_best_cluster_in_the_finstadjordet --storageBucket=jwker-test --port 8081 --credentialsPath=./sa-credentials.json
+	go run ./cmd/jwker/main.go --clustername=the_best_cluster_in_the_finstadjordet --storageBucket=jwker-test --port 3000 --credentialsPath=./sa-credentials.json
+
+gettoken:
+	go build -o bin/gettoken cmd/gettoken/*.go
 
 # Install CRDs into a cluster
 install: manifests

@@ -5,20 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 
-	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/tokendings"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const JwksSecretKey = "jwks"
+
+func ExtractJWKS(sec corev1.Secret) (jose.JSONWebKeySet, error) {
+	jwks := jose.JSONWebKeySet{}
+	err := json.Unmarshal(sec.Data[JwksSecretKey], &jwks)
+	return jwks, err
+}
 
 func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) (corev1.Secret, error) {
 	clientPrivateJwksJson, err := json.MarshalIndent(clientPrivateJwks, "", " ")
 	if err != nil {
 		return corev1.Secret{}, err
 	}
-	stringdata := map[string]string{"jwks": string(clientPrivateJwksJson)}
+	stringdata := map[string]string{JwksSecretKey: string(clientPrivateJwksJson)}
 
 	return corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -35,33 +43,27 @@ func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJ
 	}, nil
 }
 
-func ReconcileSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
-	if err := DeleteClusterSecrets(cli, ctx, app, secretName); err != nil {
-		return fmt.Errorf("Unable to delete clusterSecrets from cluster: %s", err)
-	}
-
+func CreateSecret(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
 	secretSpec, err := CreateSecretSpec(app, secretName, clientPrivateJwks)
 	if err != nil {
 		return fmt.Errorf("Unable to create secretSpec object: %s", err)
 	}
 
-	// if err := cli.Get(ctx, client.ObjectKey{Namespace: app.Namespace, Name: secretName}, secretSpec.DeepCopyObject()); err != nil {
-	//if !errors.IsNotFound(err) {
-	//	return fmt.Errorf("Unable to fetch secret: %s", err)
-	//}
-	if err := cli.Create(ctx, secretSpec.DeepCopyObject()); err != nil {
+	err = cli.Create(ctx, &secretSpec)
+	if errors.IsAlreadyExists(err) {
+		err = cli.Update(ctx, &secretSpec)
+	}
+
+	if err != nil {
 		return fmt.Errorf("Unable to apply secretSpec: %s", err)
 	}
-	// }
-	if err := jwkermetrics.SetTotalJwkerSecrets(cli); err != nil {
-		return err
-	}
+
 	return nil
 }
 
 // TODO: Make exclusion optional
 func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string) error {
-	secretList, err := fetchClusterSecrets(app.Name, app.Namespace, cli)
+	secretList, err := ClusterSecrets(ctx, app, cli)
 	if err != nil {
 		return err
 	}
@@ -76,13 +78,13 @@ func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings
 	return nil
 }
 
-func fetchClusterSecrets(app, namespace string, cli client.Client) (corev1.SecretList, error) {
+func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Client) (corev1.SecretList, error) {
 	var secrets corev1.SecretList
 	var mLabels = client.MatchingLabels{}
 
-	mLabels["app"] = app
+	mLabels["app"] = app.Name
 	mLabels["type"] = "jwker.nais.io"
-	if err := cli.List(context.Background(), &secrets, client.InNamespace(namespace), mLabels); err != nil {
+	if err := cli.List(ctx, &secrets, client.InNamespace(app.Namespace), mLabels); err != nil {
 		return secrets, err
 	}
 	return secrets, nil

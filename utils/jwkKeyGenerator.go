@@ -12,6 +12,11 @@ import (
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+type KeySet struct {
+	Private jose.JSONWebKeySet
+	Public  jose.JSONWebKeySet
+}
+
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -20,15 +25,7 @@ func RandStringBytes(n int) string {
 	return string(b)
 }
 
-func GenerateJwkerKeys() (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
-	jwk, err := JwkKeyGenerator()
-	if err != nil {
-		return jose.JSONWebKeySet{}, jose.JSONWebKeySet{}, err
-	}
-	return JwksGenerator(jwk, jose.JSONWebKey{})
-}
-
-func JwkKeyGenerator() (jose.JSONWebKey, error) {
+func GenerateJWK() (jose.JSONWebKey, error) {
 	privateKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	if err != nil {
 		return jose.JSONWebKey{}, err
@@ -43,18 +40,34 @@ func JwkKeyGenerator() (jose.JSONWebKey, error) {
 	}
 	return jwk, nil
 }
-func JwksGenerator(jwk jose.JSONWebKey, existing jose.JSONWebKey) (jose.JSONWebKeySet, jose.JSONWebKeySet, error) {
 
-	var privateJwks []jose.JSONWebKey
-	var publicJwks []jose.JSONWebKey
-
-	privateJwks = append(privateJwks, jwk)
-	publicJwks = append(publicJwks, jwk.Public())
-	if len(existing.KeyID) > 0 {
-		publicJwks = append(publicJwks, existing.Public())
+func KeySetWithoutExisting(jwk jose.JSONWebKey) KeySet {
+	return KeySet{
+		Private: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				jwk,
+			},
+		},
+		Public: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				jwk.Public(),
+			},
+		},
 	}
-	privateKeyset := jose.JSONWebKeySet{Keys: privateJwks}
-	publicKeyset := jose.JSONWebKeySet{Keys: publicJwks}
+}
 
-	return privateKeyset, publicKeyset, nil
+func KeySetWithExisting(newjwk jose.JSONWebKey, existingjwk jose.JSONWebKey) KeySet {
+	return KeySet{
+		Private: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				newjwk,
+			},
+		},
+		Public: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				newjwk.Public(),
+				existingjwk.Public(),
+			},
+		},
+	}
 }

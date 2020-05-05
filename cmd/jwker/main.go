@@ -1,15 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"net/http"
+	"io/ioutil"
 	"os"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-	"github.com/nais/jwker/pkg/storage"
-	"github.com/nais/jwker/utils"
+	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -35,7 +31,6 @@ func init() {
 		jwkermetrics.JwkersTotal,
 		jwkermetrics.JwkersProcessedCount,
 		jwkermetrics.JwkerSecretsTotal,
-		jwkermetrics.JwkerBucketObjects,
 	)
 
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -44,22 +39,37 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+func loadCredentials(path string) (*jose.JSONWebKey, error) {
+	creds, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	jwk := &jose.JSONWebKey{}
+	err = jwk.UnmarshalJSON(creds)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwk, nil
+}
+
 func main() {
+	var clientID string
+	var authProviderURL string
 	var metricsAddr string
 	var clusterName string
-	var storagePath string
 	var tokenDingsUrl string
-	var storageBucket string
-	var credentialsPath string
-	var port string
+	var tokenDingsClientId string
+	var azureJWKFile string
 
+	flag.StringVar(&azureJWKFile, "azureJWKFile", "/var/run/secrets/azure/jwk.json", "file with JWK credential for Azure")
+	flag.StringVar(&clientID, "clientID", os.Getenv("JWKER_CLIENT_ID"), "azure client id")
+	flag.StringVar(&clusterName, "clustername", os.Getenv("CLUSTER_NAME"), "Name of runtime cluster")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
-	flag.StringVar(&port, "port", "8080", "The address the .well-know endpoints is served on.")
-	flag.StringVar(&clusterName, "clustername", "cluster_name_not_set", "Name of runtime cluster")
-	flag.StringVar(&storagePath, "storagepath", "storage.json", "path to storage object")
-	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", "http://localhost:8080", "URL to tokendings")
-	flag.StringVar(&storageBucket, "storageBucket", "jwker-dev", "Bucket name")
-	flag.StringVar(&credentialsPath, "credentialsPath", "./sa-credentials.json", "path to sa-credentials.json")
+	flag.StringVar(&authProviderURL, "authProviderURL", os.Getenv("AUTH_PROVIDER_URL"), "")
+	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", os.Getenv("TOKENDINGS_CLIENT_ID"), "ClientID of tokendings")
+	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", os.Getenv("TOKENDINGS_URL"), "URL to tokendings")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -74,43 +84,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	privateJwks, publicJwks, err := utils.GenerateJwkerKeys()
+	creds, err := loadCredentials(azureJWKFile)
 	if err != nil {
-		setupLog.Error(err, "Unable to generate jwks")
-	}
-
-	if _, err := os.Stat(credentialsPath); err != nil {
-		setupLog.Error(err, "Credentials file is missing. Exiting...\n")
+		setupLog.Error(err, "unable to load azure credentials")
 		os.Exit(1)
 	}
-	jwkerStorage, err := storage.New(credentialsPath, storageBucket)
-	if err != nil {
-		setupLog.Error(err, "Unable to instantiate jwkerStorage")
+
+	reconciler := &controllers.JwkerReconciler{
+		AzureCredentials:   *creds,
+		Client:             mgr.GetClient(),
+		ClientID:           clientID,
+		ClusterName:        clusterName,
+		Log:                ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Scheme:             mgr.GetScheme(),
+		Endpoint:           authProviderURL,
+		TokenDingsUrl:      tokenDingsUrl,
+		TokendingsClientID: tokenDingsClientId,
 	}
-	if err = (&controllers.JwkerReconciler{
-		Client:           mgr.GetClient(),
-		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Scheme:           mgr.GetScheme(),
-		ClusterName:      clusterName,
-		StoragePath:      storagePath,
-		JwkerPrivateJwks: &privateJwks,
-		TokenDingsUrl:    tokenDingsUrl,
-		JwkerStorage:     jwkerStorage,
-	}).SetupWithManager(mgr); err != nil {
+
+	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
-	res, err := json.MarshalIndent(publicJwks, "", " ")
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	setupLog.Info("starting token refresh goroutine")
+	go reconciler.RefreshToken()
 
-	r.Get("/jwks", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(res)
-	})
-	go http.ListenAndServe(":"+port, r)
 	metrics.Registry.MustRegister()
+	setupLog.Info("starting metrics refresh goroutine")
+	go jwkermetrics.RefreshTotalJwkerClusterMetrics(mgr.GetClient())
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

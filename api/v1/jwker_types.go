@@ -1,8 +1,6 @@
 package v1
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,6 +37,8 @@ type JwkerStatus struct {
 	SynchronizationHash  string `json:"synchronizationHash,omitempty"`
 }
 
+// +genclient
+// +kubebuilder:printcolumn:name="Secret",type="string",JSONPath=".spec.secretName"
 // +kubebuilder:object:root=true
 
 // Jwker is the Schema for the jwkers API
@@ -48,29 +48,6 @@ type Jwker struct {
 
 	Spec   JwkerSpec   `json:"spec,omitempty"`
 	Status JwkerStatus `json:"status,omitempty"`
-}
-
-func (s *JwkerStatus) Successfull(hash string) JwkerStatus {
-	return JwkerStatus{
-		SynchronizationTime:  time.Now().UnixNano(),
-		SynchronizationState: EventRolloutComplete,
-		SynchronizationHash:  hash,
-	}
-}
-
-func (s *JwkerStatus) FailedPrepare(hash string) JwkerStatus {
-	return JwkerStatus{
-		SynchronizationTime:  time.Now().UnixNano(),
-		SynchronizationState: EventFailedPrepare,
-		SynchronizationHash:  hash,
-	}
-}
-func (s *JwkerStatus) FailedSynchronization(hash string) JwkerStatus {
-	return JwkerStatus{
-		SynchronizationTime:  time.Now().UnixNano(),
-		SynchronizationState: EventFailedSynchronization,
-		SynchronizationHash:  hash,
-	}
 }
 
 // +kubebuilder:object:root=true

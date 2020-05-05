@@ -2,6 +2,7 @@ package tokendings
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -39,15 +40,16 @@ type ClientRegistrationResponse struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 }
 
+// TODO: sign
 type SoftwareStatement struct {
 	AppId                string   `json:"appId"`
 	AccessPolicyInbound  []string `json:"accessPolicyInbound"`
 	AccessPolicyOutbound []string `json:"accessPolicyOutbound"`
 }
 
-func DeleteClient(accessToken string, tokenDingsUrl string, appClientId ClientId) error {
+func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string, appClientId ClientId) error {
 	fmt.Printf("%s/registration/client/%s\n", tokenDingsUrl, url.QueryEscape(appClientId.String()))
-	request, err := http.NewRequest("DELETE", fmt.Sprintf("%s/registration/client/%s", tokenDingsUrl, url.QueryEscape(appClientId.String())), nil)
+	request, err := http.NewRequestWithContext(ctx, "DELETE", fmt.Sprintf("%s/registration/client/%s", tokenDingsUrl, url.QueryEscape(appClientId.String())), nil)
 	if err != nil {
 		return err
 	}
@@ -59,14 +61,14 @@ func DeleteClient(accessToken string, tokenDingsUrl string, appClientId ClientId
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 
 	return fmt.Errorf("Something went wrong when deleting client from tokendings")
 }
 
-func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId ClientId, j *v1.Jwker) ([]byte, error) {
+func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId ClientId, jwker v1.Jwker) error {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: jwkerPrivateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -74,20 +76,19 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 
 	rsaSigner, err := jose.NewSigner(key, &signerOpts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	builder := jwt.Signed(rsaSigner)
 
-	softwareStatement, err := createSoftwareStatement(j, appClientId)
+	softwareStatement, err := createSoftwareStatement(jwker, appClientId)
 	if err != nil {
-
-		return nil, err
+		return err
 	}
 	builder = builder.Claims(softwareStatement)
 
 	rawJWT, err := builder.CompactSerialize()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	cr := ClientRegistration{
 		ClientName:        appClientId.String(),
@@ -96,11 +97,11 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 	}
 	data, err := json.Marshal(cr)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/client", tokenDingsUrl), bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -108,33 +109,37 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 	client := http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("Unable to register application with tokendings. StatusCode: %d", resp.StatusCode)
-	}
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		response, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("unable to register application with tokendings: %s: %s", resp.Status, response)
 	}
 
-	return bodyBytes, nil
+	return nil
 }
 
-func createSoftwareStatement(jwker *v1.Jwker, appId ClientId) (SoftwareStatement, error) {
+func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement, error) {
 	var inbound []string
 	var outbound []string
-	for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
-		cluster, namespace := parseAccessPolicy(rule, appId)
-		inbound = append(inbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+	if jwker.Spec.AccessPolicy == nil {
+		return nil, fmt.Errorf("no access policy")
 	}
-	for _, rule := range jwker.Spec.AccessPolicy.Outbound.Rules {
-		cluster, namespace := parseAccessPolicy(rule, appId)
-		outbound = append(outbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+	if jwker.Spec.AccessPolicy.Inbound != nil {
+		for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
+			cluster, namespace := parseAccessPolicy(rule, appId)
+			inbound = append(inbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+		}
 	}
-	return SoftwareStatement{
+	if jwker.Spec.AccessPolicy.Outbound != nil {
+		for _, rule := range jwker.Spec.AccessPolicy.Outbound.Rules {
+			cluster, namespace := parseAccessPolicy(rule, appId)
+			outbound = append(outbound, fmt.Sprintf("%s:%s:%s", cluster, namespace, rule.Application))
+		}
+	}
+	return &SoftwareStatement{
 		AppId:                appId.String(),
 		AccessPolicyInbound:  inbound,
 		AccessPolicyOutbound: outbound,
