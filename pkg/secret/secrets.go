@@ -61,7 +61,6 @@ func CreateSecret(cli client.Client, ctx context.Context, app tokendings.ClientI
 	return nil
 }
 
-// TODO: Make exclusion optional
 func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string) error {
 	secretList, err := ClusterSecrets(ctx, app, cli)
 	if err != nil {
@@ -69,8 +68,7 @@ func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings
 	}
 	for _, clusterSecret := range secretList.Items {
 		if clusterSecret.Name != secretName {
-			// r.Log.Info(fmt.Sprintf("Deleting clusterSecret %s in %s", clusterSecret.Name, clusterSecret.Namespace))
-			if err := cli.Delete(ctx, clusterSecret.DeepCopyObject()); err != nil {
+			if err := cli.Delete(ctx, &clusterSecret); err != nil {
 				return fmt.Errorf("Unable to delete clusterSecret: %s", err)
 			}
 		}
