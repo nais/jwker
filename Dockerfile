@@ -29,6 +29,5 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuf
 FROM alpine:3
 WORKDIR /
 COPY --from=builder /workspace/jwker /jwker
-USER nonroot:nonroot
 
 CMD ["/jwker"]
