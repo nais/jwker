@@ -5,7 +5,7 @@ metadata:
   name: test
 
 ---
-apiVersion: jwker.nais.io/v1
+apiVersion: nais.io/v1
 kind: Jwker
 metadata:
   name: app1
@@ -21,7 +21,7 @@ spec:
         - application: app2
 
 ---
-apiVersion: jwker.nais.io/v1
+apiVersion: nais.io/v1
 kind: Jwker
 metadata:
   name: app2

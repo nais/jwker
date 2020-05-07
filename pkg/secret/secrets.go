@@ -36,7 +36,7 @@ func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJ
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: app.Namespace,
-			Labels:    map[string]string{"app": app.Name, "type": "jwker.nais.io"},
+			Labels:    map[string]string{"app": app.Name, "type": "nais.io"},
 		},
 		StringData: stringdata,
 		Type:       "Opaque",
@@ -81,7 +81,7 @@ func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Cli
 	var mLabels = client.MatchingLabels{}
 
 	mLabels["app"] = app.Name
-	mLabels["type"] = "jwker.nais.io"
+	mLabels["type"] = "nais.io"
 	if err := cli.List(ctx, &secrets, client.InNamespace(app.Namespace), mLabels); err != nil {
 		return secrets, err
 	}
