@@ -17,7 +17,6 @@ spec:
     spec:
       containers:
       - args:
-        - --clustername=dev-gcp
         - --storageBucket=jwker-test
         - --port=8080
         - --credentialsPath=/var/run/secret/sa-credentials.json

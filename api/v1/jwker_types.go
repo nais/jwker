@@ -26,8 +26,8 @@ type AccessPolicyInbound struct {
 }
 type AccessPolicyRule struct {
 	Application string `json:"application"`
-	Namespace   string `json:"namespace,omitempty"`
-	Cluster     string `json:"cluster,omitempty"`
+	Namespace   string `json:"namespace"`
+	Cluster     string `json:"cluster"`
 }
 
 // JwkerStatus defines the observed state of Jwker

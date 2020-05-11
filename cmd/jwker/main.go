@@ -58,14 +58,12 @@ func main() {
 	var clientID string
 	var authProviderURL string
 	var metricsAddr string
-	var clusterName string
 	var tokenDingsUrl string
 	var tokenDingsClientId string
 	var azureJWKFile string
 
 	flag.StringVar(&azureJWKFile, "azureJWKFile", "/var/run/secrets/azure/jwk.json", "file with JWK credential for Azure")
 	flag.StringVar(&clientID, "clientID", os.Getenv("JWKER_CLIENT_ID"), "azure client id")
-	flag.StringVar(&clusterName, "clustername", os.Getenv("CLUSTER_NAME"), "Name of runtime cluster")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.StringVar(&authProviderURL, "authProviderURL", os.Getenv("AUTH_PROVIDER_URL"), "")
 	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", os.Getenv("TOKENDINGS_CLIENT_ID"), "ClientID of tokendings")
@@ -94,7 +92,6 @@ func main() {
 		AzureCredentials:   *creds,
 		Client:             mgr.GetClient(),
 		ClientID:           clientID,
-		ClusterName:        clusterName,
 		Log:                ctrl.Log.WithName("controllers").WithName("Jwker"),
 		Scheme:             mgr.GetScheme(),
 		Endpoint:           authProviderURL,

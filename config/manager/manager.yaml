@@ -26,7 +26,6 @@ spec:
       - command:
         - /jwker
         args:
-        - --clustername=the_best_cluster
         - --storageBucket=jwker-test
         - --port=8081
         - --credentialsPath=/var/run/secret/sa-credentials.json

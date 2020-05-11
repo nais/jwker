@@ -6,15 +6,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: jwkers.jwker.nais.io
+  name: jwkers.nais.io
 spec:
-  group: jwker.nais.io
+  additionalPrinterColumns:
+  - JSONPath: .spec.secretName
+    name: Secret
+    type: string
+  group: nais.io
   names:
     kind: Jwker
     listKind: JwkerList
     plural: jwkers
     singular: jwker
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: Jwker is the Schema for the jwkers API
@@ -48,6 +53,8 @@ spec:
                             type: string
                         required:
                         - application
+                        - cluster
+                        - namespace
                         type: object
                       type: array
                   type: object
@@ -64,6 +71,8 @@ spec:
                             type: string
                         required:
                         - application
+                        - cluster
+                        - namespace
                         type: object
                       type: array
                   type: object

@@ -5,7 +5,7 @@ metadata:
   name: test
 
 ---
-apiVersion: jwker.nais.io/v1
+apiVersion: nais.io/v1
 kind: Jwker
 metadata:
   name: app1
@@ -16,12 +16,16 @@ spec:
     inbound:
       rules:
         - application: app2
+          namespace: test
+          cluster: balls
     outbound:
       rules:
         - application: app2
+          namespace: test
+          cluster: balls
 
 ---
-apiVersion: jwker.nais.io/v1
+apiVersion: nais.io/v1
 kind: Jwker
 metadata:
   name: app2
@@ -32,9 +36,13 @@ spec:
     inbound:
       rules:
         - application: app1
+          namespace: test
+          cluster: balls
     outbound:
       rules:
         - application: app1
+          namespace: test
+          cluster: balls
 
 ---
 apiVersion: apps/v1
