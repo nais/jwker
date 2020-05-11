@@ -268,6 +268,9 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Update Jwker resource with status event
 	defer func() {
 		jwker.Status.SynchronizationTime = time.Now().UnixNano()
+		if jwker.Status.SynchronizationState == jwkerv1.EventFailedSynchronization || jwker.Status.SynchronizationState == jwkerv1.EventFailedPrepare {
+			return
+		}
 		err := r.Update(ctx, &jwker)
 		if err != nil {
 			r.logger.Error(err, "failed writing status")
