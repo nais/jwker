@@ -39,7 +39,7 @@ func RefreshTotalJwkerClusterMetrics(cli client.Client) error {
 
 	var secretList v1.SecretList
 	var mLabels = client.MatchingLabels{}
-	mLabels["type"] = "jwker.nais.io"
+	mLabels["type"] = "nais.io"
 	var jwkerList jwkerv1.JwkerList
 
 	t := time.NewTicker(exp)

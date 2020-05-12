@@ -61,9 +61,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: jwkers.jwker.nais.io
+  name: jwkers.nais.io
 spec:
-  group: jwker.nais.io
+  group: nais.io
   names:
     kind: Jwker
     listKind: JwkerList

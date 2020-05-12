@@ -161,7 +161,7 @@ func fixtures(cli client.Client) error {
 				Namespace: namespace,
 				Labels: map[string]string{
 					"app":  appName,
-					"type": "jwker.nais.io",
+					"type": "nais.io",
 				},
 			},
 			StringData: map[string]string{
@@ -185,7 +185,7 @@ func fixtures(cli client.Client) error {
 				Namespace: namespace,
 				Labels: map[string]string{
 					"app":  appName,
-					"type": "jwker.nais.io",
+					"type": "nais.io",
 				},
 			},
 		},

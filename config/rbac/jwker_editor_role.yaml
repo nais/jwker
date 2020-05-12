@@ -5,7 +5,7 @@ metadata:
   name: jwker-editor-role
 rules:
 - apiGroups:
-  - jwker.nais.io
+  - nais.io
   resources:
   - jwkers
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - jwker.nais.io
+  - nais.io
   resources:
   - jwkers/status
   verbs:
