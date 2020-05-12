@@ -3,7 +3,6 @@ package tokendings
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -96,8 +95,7 @@ func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, endpoint stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("%s: %s", resp.Status, string(body))
+		return nil, fmt.Errorf("%s", resp.Status)
 	}
 
 	token := &TokenResponse{}
