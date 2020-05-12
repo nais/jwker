@@ -21,10 +21,12 @@ go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.5
 ```
 
 The following environment variables are used to run jwker using token-dings mock as id-provider
+```
 AUTH_PROVIDER_URL=http://localhost:1111/aadmock/token
 TOKENDINGS_CLIENT_ID=tokendings
 JWKER_CLIENT_ID=jwker_client_id_1
 TOKENDINGS_URL=http://localhost:8080
+```
 
 You will also need a jwk when fetching an access token from idprovider mock.
 Generate a new jwk with the following command:
