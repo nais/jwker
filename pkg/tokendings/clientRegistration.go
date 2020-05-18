@@ -65,7 +65,9 @@ func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string,
 		return nil
 	}
 
-	return fmt.Errorf("Something went wrong when deleting client from tokendings")
+	msg, _ := ioutil.ReadAll(resp.Body)
+
+	return fmt.Errorf("delete client from tokendings: %s: %s", resp.Status, msg)
 }
 
 func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId ClientId, jwker v1.Jwker) error {
