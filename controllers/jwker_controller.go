@@ -197,14 +197,22 @@ func (r *JwkerReconciler) create(tx transaction) error {
 
 	app := r.appClientID(tx.req)
 
-	r.logger.Info(fmt.Sprintf("Registering app %s with tokendings", app.String()))
-	err := tokendings.RegisterClient(
+	cr, err := tokendings.MakeClientRegistration(
 		&r.AzureCredentials,
 		&tx.keyset.Public,
-		r.TokendingsToken.AccessToken,
-		r.TokenDingsUrl,
 		app,
 		tx.jwker,
+	)
+
+	if err != nil {
+		return fmt.Errorf("create client registration payload: %s", err)
+	}
+
+	r.logger.Info(fmt.Sprintf("Registering app %s with tokendings", app.String()))
+	err = tokendings.RegisterClient(
+		*cr,
+		r.TokendingsToken.AccessToken,
+		r.TokenDingsUrl,
 	)
 
 	if err != nil {

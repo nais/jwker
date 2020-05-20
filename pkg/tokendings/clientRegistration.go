@@ -70,7 +70,7 @@ func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string,
 	return fmt.Errorf("delete client from tokendings: %s: %s", resp.Status, msg)
 }
 
-func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, accessToken string, tokenDingsUrl string, appClientId ClientId, jwker v1.Jwker) error {
+func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, appClientId ClientId, jwker v1.Jwker) (*ClientRegistration, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: jwkerPrivateJwk.Key}
 	var signerOpts = jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -78,25 +78,29 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 
 	rsaSigner, err := jose.NewSigner(key, &signerOpts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	builder := jwt.Signed(rsaSigner)
 
 	softwareStatement, err := createSoftwareStatement(jwker, appClientId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	builder = builder.Claims(softwareStatement)
 
 	rawJWT, err := builder.CompactSerialize()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	cr := ClientRegistration{
+
+	return &ClientRegistration{
 		ClientName:        appClientId.String(),
 		Jwks:              *clientPublicJwks,
 		SoftwareStatement: rawJWT,
-	}
+	}, nil
+}
+
+func RegisterClient(cr ClientRegistration, accessToken string, tokenDingsUrl string) error {
 	data, err := json.Marshal(cr)
 	if err != nil {
 		return err
@@ -124,8 +128,8 @@ func RegisterClient(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSO
 }
 
 func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement, error) {
-	var inbound []string
-	var outbound []string
+	inbound := make([]string, 0)
+	outbound := make([]string, 0)
 	if jwker.Spec.AccessPolicy == nil {
 		return nil, fmt.Errorf("no access policy")
 	}
