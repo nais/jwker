@@ -61,6 +61,7 @@ func main() {
 	var tokenDingsUrl string
 	var tokenDingsClientId string
 	var azureJWKFile string
+	var clusterName string
 
 	flag.StringVar(&azureJWKFile, "azureJWKFile", "/var/run/secrets/azure/jwk.json", "file with JWK credential for Azure")
 	flag.StringVar(&clientID, "clientID", os.Getenv("JWKER_CLIENT_ID"), "azure client id")
@@ -68,6 +69,7 @@ func main() {
 	flag.StringVar(&authProviderURL, "authProviderURL", os.Getenv("AUTH_PROVIDER_URL"), "")
 	flag.StringVar(&tokenDingsClientId, "tokendingsClientId", os.Getenv("TOKENDINGS_CLIENT_ID"), "ClientID of tokendings")
 	flag.StringVar(&tokenDingsUrl, "tokendingsUrl", os.Getenv("TOKENDINGS_URL"), "URL to tokendings")
+	flag.StringVar(&clusterName, "clusterName", os.Getenv("CLUSTER_NAME"), "nais cluster")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -92,9 +94,10 @@ func main() {
 		AzureCredentials:   *creds,
 		Client:             mgr.GetClient(),
 		ClientID:           clientID,
+		ClusterName:        clusterName,
+		Endpoint:           authProviderURL,
 		Log:                ctrl.Log.WithName("controllers").WithName("Jwker"),
 		Scheme:             mgr.GetScheme(),
-		Endpoint:           authProviderURL,
 		TokenDingsUrl:      tokenDingsUrl,
 		TokendingsClientID: tokenDingsClientId,
 	}
