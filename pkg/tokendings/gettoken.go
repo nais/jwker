@@ -38,11 +38,12 @@ type CustomClaims struct {
 
 func Claims(clientid, audience string) CustomClaims {
 	now := time.Now()
+	exp := jwt.NewNumericDate(now.Add(time.Second * 50000000))
 
 	return CustomClaims{
 		Issuer:    clientid,
 		Subject:   clientid,
-		Expiry:    jwt.NewNumericDate(now.Add(time.Second * 50000000)),
+		Expiry:    *exp,
 		NotBefore: 1,
 		ID:        utils.RandStringBytes(8),
 		Audience:  audience,
