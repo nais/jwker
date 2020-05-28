@@ -41,22 +41,7 @@ func GenerateJWK() (jose.JSONWebKey, error) {
 	return jwk, nil
 }
 
-func KeySetWithoutExisting(jwk jose.JSONWebKey) KeySet {
-	return KeySet{
-		Private: jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{
-				jwk,
-			},
-		},
-		Public: jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{
-				jwk.Public(),
-			},
-		},
-	}
-}
-
-func KeySetWithExisting(newjwk jose.JSONWebKey, existingjwk jose.JSONWebKey) KeySet {
+func KeySetWithExisting(newjwk jose.JSONWebKey, existingjwks []jose.JSONWebKey) KeySet {
 	return KeySet{
 		Private: jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{
@@ -64,10 +49,15 @@ func KeySetWithExisting(newjwk jose.JSONWebKey, existingjwk jose.JSONWebKey) Key
 			},
 		},
 		Public: jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{
-				newjwk.Public(),
-				existingjwk.Public(),
-			},
+			Keys: publicKeys(append(existingjwks, newjwk)...),
 		},
 	}
+}
+
+func publicKeys(keys ...jose.JSONWebKey) []jose.JSONWebKey {
+	publics := make([]jose.JSONWebKey, len(keys))
+	for i := range keys {
+		publics[i] = keys[i].Public()
+	}
+	return publics
 }

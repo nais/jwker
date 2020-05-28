@@ -9,6 +9,7 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/square/go-jose.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -56,7 +57,7 @@ func TestMakeClientRegistration(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	appkeys := utils.KeySetWithoutExisting(appkey)
+	appkeys := utils.KeySetWithExisting(appkey, []jose.JSONWebKey{})
 
 	clientid := tokendings.ClientId{
 		Name:      "myapplication",

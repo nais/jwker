@@ -17,11 +17,9 @@ import (
 	"github.com/nais/jwker/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // for side effects only
 	"k8s.io/client-go/rest"
@@ -47,7 +45,7 @@ func (h *handler) serveRegistration(w http.ResponseWriter, r *http.Request) {
 	statement := &tokendings.ClientRegistration{}
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(statement)
-	if err != nil || len(statement.Jwks.Keys) != 2 {
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -96,38 +94,31 @@ func fixtures(cli client.Client) error {
 
 	err = cli.Create(
 		ctx,
-		&appsv1.Deployment{
+		&corev1.Pod{
 			TypeMeta: v1.TypeMeta{
-				Kind:       "Jwker",
+				Kind:       "Pod",
 				APIVersion: "v1",
 			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:      appName,
 				Namespace: namespace,
-			},
-			Spec: appsv1.DeploymentSpec{
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{"app": appName},
+				Labels: map[string]string{
+					"app": appName,
 				},
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: v1.ObjectMeta{
-						Labels: map[string]string{"app": appName},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "main",
+						Image: "foo",
 					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:  "main",
-								Image: "foo",
-							},
-						},
-						Volumes: []corev1.Volume{
-							{
-								Name: "foo",
-								VolumeSource: corev1.VolumeSource{
-									Secret: &corev1.SecretVolumeSource{
-										SecretName: alreadyInUseSecret,
-									},
-								},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "foo",
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: alreadyInUseSecret,
 							},
 						},
 					},
@@ -160,8 +151,8 @@ func fixtures(cli client.Client) error {
 				Name:      alreadyInUseSecret,
 				Namespace: namespace,
 				Labels: map[string]string{
-					"app":  appName,
-					"type": "nais.io",
+					"app":                 appName,
+					secret.SecretLabelKey: secret.SecretLabelType,
 				},
 			},
 			StringData: map[string]string{
@@ -184,8 +175,8 @@ func fixtures(cli client.Client) error {
 				Name:      expiredSecret,
 				Namespace: namespace,
 				Labels: map[string]string{
-					"app":  appName,
-					"type": "nais.io",
+					"app":                 appName,
+					secret.SecretLabelKey: secret.SecretLabelType,
 				},
 			},
 		},
@@ -247,6 +238,7 @@ func TestReconciler(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 		t.Fail()
+		return
 	}
 
 	go func() {
@@ -271,7 +263,7 @@ func TestReconciler(t *testing.T) {
 
 	// expired secret should be deleted
 	sec, err = getSecret(ctx, cli, namespace, expiredSecret)
-	assert.True(t, errors.IsNotFound(err))
+	assert.True(t, errors.IsNotFound(err), "expired secret should be deleted")
 
 	// retrieve the jwker resource and check that hash and status is set
 	jwk := &jwkerv1.Jwker{

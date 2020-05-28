@@ -14,11 +14,25 @@ import (
 )
 
 const JwksSecretKey = "jwks"
+const SecretLabelKey = "type"
+const SecretLabelType = "jwker.nais.io"
 
 func ExtractJWKS(sec corev1.Secret) (jose.JSONWebKeySet, error) {
 	jwks := jose.JSONWebKeySet{}
 	err := json.Unmarshal(sec.Data[JwksSecretKey], &jwks)
 	return jwks, err
+}
+
+func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
+	jwks, err := ExtractJWKS(sec)
+	if err != nil {
+		return nil, err
+	}
+	keysLen := len(jwks.Keys)
+	if keysLen != 1 {
+		return nil, fmt.Errorf("secret has %d keys, expecting exactly 1", keysLen)
+	}
+	return &jwks.Keys[0], nil
 }
 
 func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) (corev1.Secret, error) {
@@ -36,7 +50,7 @@ func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJ
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: app.Namespace,
-			Labels:    map[string]string{"app": app.Name, "type": "nais.io"},
+			Labels:    map[string]string{"app": app.Name, SecretLabelKey: SecretLabelType},
 		},
 		StringData: stringdata,
 		Type:       "Opaque",
@@ -81,7 +95,7 @@ func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Cli
 	var mLabels = client.MatchingLabels{}
 
 	mLabels["app"] = app.Name
-	mLabels["type"] = "nais.io"
+	mLabels[SecretLabelKey] = SecretLabelType
 	if err := cli.List(ctx, &secrets, client.InNamespace(app.Namespace), mLabels); err != nil {
 		return secrets, err
 	}

@@ -48,7 +48,6 @@ type SoftwareStatement struct {
 }
 
 func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string, appClientId ClientId) error {
-	fmt.Printf("%s/registration/client/%s\n", tokenDingsUrl, url.QueryEscape(appClientId.String()))
 	request, err := http.NewRequestWithContext(ctx, "DELETE", fmt.Sprintf("%s/registration/client/%s", tokenDingsUrl, url.QueryEscape(appClientId.String())), nil)
 	if err != nil {
 		return err

@@ -8,14 +8,13 @@ import (
 
 	"github.com/go-logr/logr"
 	jwkerv1 "github.com/nais/jwker/api/v1"
-	"github.com/nais/jwker/pkg/deployment"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
+	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -113,7 +112,25 @@ type transaction struct {
 	jwker       jwkerv1.Jwker
 }
 
-func secretsInDeployment(secrets corev1.SecretList, deploy appsv1.Deployment) secretLists {
+func secretInPod(secret corev1.Secret, pod corev1.Pod) bool {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Secret != nil && volume.Secret.SecretName == secret.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func secretInPods(secret corev1.Secret, pods corev1.PodList) bool {
+	for _, pod := range pods.Items {
+		if secretInPod(secret, pod) {
+			return true
+		}
+	}
+	return false
+}
+
+func podSecretLists(secrets corev1.SecretList, pods corev1.PodList) secretLists {
 	lists := secretLists{
 		Used: corev1.SecretList{
 			Items: make([]corev1.Secret, 0),
@@ -124,14 +141,9 @@ func secretsInDeployment(secrets corev1.SecretList, deploy appsv1.Deployment) se
 	}
 
 	for _, sec := range secrets.Items {
-		used := false
-		for _, volume := range deploy.Spec.Template.Spec.Volumes {
-			if volume.Secret != nil && volume.Secret.SecretName == sec.Name {
-				lists.Used.Items = append(lists.Used.Items, sec)
-				used = true
-			}
-		}
-		if !used {
+		if secretInPods(sec, pods) {
+			lists.Used.Items = append(lists.Used.Items, sec)
+		} else {
 			lists.Unused.Items = append(lists.Unused.Items, sec)
 		}
 	}
@@ -142,8 +154,8 @@ func secretsInDeployment(secrets corev1.SecretList, deploy appsv1.Deployment) se
 func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*transaction, error) {
 	app := r.appClientID(req)
 
-	// fetch deployment object for this app
-	deploy, err := deployment.Deployment(ctx, app, r)
+	// fetch running pods for this app
+	podList, err := pods.ApplicationPods(ctx, app, r.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -155,12 +167,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*trans
 	}
 
 	// find intersect between secrets in use by deployment and all jwker managed secrets
-	secrets := secretsInDeployment(allSecrets, *deploy)
-
-	used := len(secrets.Used.Items)
-	if used > 1 {
-		return nil, fmt.Errorf("deployment has %d references to jwker secrets, expecting at most 1", used)
-	}
+	secrets := podSecretLists(allSecrets, *podList)
 
 	newJwk, err := utils.GenerateJWK()
 	if err != nil {
@@ -168,22 +175,16 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*trans
 	}
 
 	jwks := jose.JSONWebKeySet{}
-	keyset := utils.KeySet{}
 
-	if used == 0 {
-		keyset = utils.KeySetWithoutExisting(newJwk)
-	} else {
-		jwks, err = secret.ExtractJWKS(secrets.Used.Items[0])
+	for _, sec := range secrets.Used.Items {
+		jwk, err := secret.ExtractJWK(sec)
 		if err != nil {
 			return nil, err
 		}
-
-		if len(jwks.Keys) != 1 {
-			return nil, fmt.Errorf("secret has %d keys, expecting exactly 1", used)
-		}
-
-		keyset = utils.KeySetWithExisting(newJwk, jwks.Keys[0])
+		jwks.Keys = append(jwks.Keys, *jwk)
 	}
+
+	keyset := utils.KeySetWithExisting(newJwk, jwks.Keys)
 
 	return &transaction{
 		ctx:         ctx,
