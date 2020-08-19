@@ -133,8 +133,8 @@ func fixtures(cli client.Client) error {
 	if err != nil {
 		return err
 	}
-	//jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key}}
-	keyBytes, err := key.MarshalJSON() //json.Marshal(jwks)
+
+	keyBytes, err := key.MarshalJSON()
 	if err != nil {
 		return err
 	}
