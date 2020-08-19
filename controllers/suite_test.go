@@ -16,7 +16,6 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,8 +133,8 @@ func fixtures(cli client.Client) error {
 	if err != nil {
 		return err
 	}
-	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key}}
-	keyBytes, err := json.Marshal(jwks)
+	//jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{key}}
+	keyBytes, err := key.MarshalJSON() //json.Marshal(jwks)
 	if err != nil {
 		return err
 	}
@@ -156,7 +155,7 @@ func fixtures(cli client.Client) error {
 				},
 			},
 			StringData: map[string]string{
-				secret.JwksSecretKey: string(keyBytes),
+				secret.JwkSecretKey: string(keyBytes),
 			},
 		},
 	)
@@ -254,7 +253,7 @@ func TestReconciler(t *testing.T) {
 	assert.NotNil(t, sec)
 
 	// secret must have data
-	assert.NotEmpty(t, sec.Data[secret.JwksSecretKey])
+	assert.NotEmpty(t, sec.Data[secret.JwkSecretKey])
 
 	// existing, in-use secret should be preserved
 	sec, err = getSecret(ctx, cli, namespace, alreadyInUseSecret)
