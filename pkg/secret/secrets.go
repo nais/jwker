@@ -13,21 +13,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const JwksSecretKey = "jwks"
+const JwkSecretKey = "jwk"
 const SecretLabelKey = "type"
 const SecretLabelType = "jwker.nais.io"
 
-func ExtractJWKS(sec corev1.Secret) (jose.JSONWebKeySet, error) {
-	jwks := jose.JSONWebKeySet{}
-	err := json.Unmarshal(sec.Data[JwksSecretKey], &jwks)
-	return jwks, err
-}
-
-func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
-	jwks, err := ExtractJWKS(sec)
-	if err != nil {
-		return nil, err
-	}
+func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
 	keysLen := len(jwks.Keys)
 	if keysLen != 1 {
 		return nil, fmt.Errorf("secret has %d keys, expecting exactly 1", keysLen)
@@ -35,12 +25,24 @@ func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 	return &jwks.Keys[0], nil
 }
 
+func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
+	jwk := jose.JSONWebKey{}
+	err := json.Unmarshal(sec.Data[JwkSecretKey], &jwk)
+	return &jwk, err
+}
+
 func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) (corev1.Secret, error) {
-	clientPrivateJwksJson, err := json.MarshalIndent(clientPrivateJwks, "", " ")
+	jwk, err := FirstJWK(clientPrivateJwks)
 	if err != nil {
 		return corev1.Secret{}, err
 	}
-	stringdata := map[string]string{JwksSecretKey: string(clientPrivateJwksJson)}
+
+	clientPrivateJwkJson, err := json.MarshalIndent(jwk, "", "")
+	if err != nil {
+		return corev1.Secret{}, err
+	}
+
+	stringdata := map[string]string{JwkSecretKey: string(clientPrivateJwkJson)}
 
 	return corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
