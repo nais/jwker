@@ -150,12 +150,12 @@ func fixtures(cli client.Client) error {
 				Name:      alreadyInUseSecret,
 				Namespace: namespace,
 				Labels: map[string]string{
-					"app":                 appName,
-					secret.SecretLabelKey: secret.SecretLabelType,
+					"app":                       appName,
+					secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
 				},
 			},
 			StringData: map[string]string{
-				secret.JwkSecretKey: string(keyBytes),
+				secret.TokenXPrivateJwkKey: string(keyBytes),
 			},
 		},
 	)
@@ -174,8 +174,8 @@ func fixtures(cli client.Client) error {
 				Name:      expiredSecret,
 				Namespace: namespace,
 				Labels: map[string]string{
-					"app":                 appName,
-					secret.SecretLabelKey: secret.SecretLabelType,
+					"app":                       appName,
+					secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
 				},
 			},
 		},
@@ -253,7 +253,7 @@ func TestReconciler(t *testing.T) {
 	assert.NotNil(t, sec)
 
 	// secret must have data
-	assert.NotEmpty(t, sec.Data[secret.JwkSecretKey])
+	assert.NotEmpty(t, sec.Data[secret.TokenXPrivateJwkKey])
 
 	// existing, in-use secret should be preserved
 	sec, err = getSecret(ctx, cli, namespace, alreadyInUseSecret)

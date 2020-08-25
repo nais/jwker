@@ -23,20 +23,16 @@ func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
 			Namespace: corev1.NamespaceDefault,
 			Name:      "some-secret",
 		},
-		Data: map[string][]byte{"jwk": j},
+		Data: map[string][]byte{TokenXPrivateJwkKey: j},
 	}, nil
 }
 
 func TestExtractJWK(t *testing.T) {
 	jwk, err := utils.GenerateJWK()
-	if err != nil {
-		panic(err)
-	}
+	assert.NoError(t, err)
 
 	secret, err := GetAsSecret(jwk)
-	if err != nil {
-		panic(err)
-	}
+	assert.NoError(t, err)
 
 	extractedJwk, err := ExtractJWK(secret)
 
@@ -53,17 +49,21 @@ func TestCreateSecretSpec(t *testing.T) {
 	secretName := "test-secret"
 	jwk, err := utils.GenerateJWK()
 	assert.NoError(t, err)
-	clientPrivateJwks := jose.JSONWebKeySet{
-		Keys: []jose.JSONWebKey{jwk},
-	}
 
-	actual, err := CreateSecretSpec(app, secretName, clientPrivateJwks)
+	secretData := PodSecretData{
+		ClientId:               app,
+		Jwk:                    jwk,
+		TokenDingsWellKnownUrl: "http://test/wellknown",
+	}
+	actual, err := CreateSecretSpec(secretName, secretData)
 	assert.NoError(t, err)
 
 	t.Run("should contain JWK", func(t *testing.T) {
-		expected, err := json.MarshalIndent(jwk, "", "")
+		expected, err := json.Marshal(jwk)
 		assert.NoError(t, err)
-		assert.Equal(t, string(expected), actual.StringData[JwkSecretKey])
+		assert.Equal(t, string(expected), actual.StringData[TokenXPrivateJwkKey])
+		assert.Equal(t, "http://test/wellknown", actual.StringData[TokenXWellKnownUrlKey])
+		assert.Equal(t, app.String(), actual.StringData[TokenXClientIdKey])
 	})
 }
 
