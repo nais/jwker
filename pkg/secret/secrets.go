@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const OldJwksKey = "jwks"
 const TokenXPrivateJwkKey = "TOKEN_X_PRIVATE_JWK"
 const TokenXWellKnownUrlKey = "TOKEN_X_WELL_KNOWN_URL"
 const TokenXClientIdKey = "TOKEN_X_CLIENT_ID"
@@ -36,7 +37,20 @@ func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
 func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 	jwk := jose.JSONWebKey{}
 	err := json.Unmarshal(sec.Data[TokenXPrivateJwkKey], &jwk)
+	if err != nil {
+		return extractOldJwk(sec)
+	}
 	return &jwk, err
+}
+
+//temporary func to handle renaming/changes to expected jwker secret
+func extractOldJwk(sec corev1.Secret) (*jose.JSONWebKey, error) {
+	jwks := jose.JSONWebKeySet{}
+	err := json.Unmarshal(sec.Data[OldJwksKey], &jwks)
+	if err != nil {
+		return nil, err
+	}
+	return FirstJWK(jwks)
 }
 
 func CreateSecretSpec(secretName string, data PodSecretData) (corev1.Secret, error) {
