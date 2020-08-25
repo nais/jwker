@@ -221,7 +221,18 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	}
 
 	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Name, app.Namespace))
-	if err := secret.CreateSecret(r, tx.ctx, app, tx.jwker.Spec.SecretName, tx.keyset.Private); err != nil {
+
+	jwk, err := secret.FirstJWK(tx.keyset.Private)
+	if err != nil {
+		return fmt.Errorf("unable to get first jwk from jwks: %s", err)
+	}
+	secretData := secret.PodSecretData{
+		ClientId:               app,
+		Jwk:                    *jwk,
+		TokenDingsWellKnownUrl: secret.WellKnownUrl(r.TokenDingsUrl),
+	}
+
+	if err := secret.CreateSecret(r, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
 		return fmt.Errorf("reconciling secrets: %s", err)
 	}
 

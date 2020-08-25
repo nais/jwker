@@ -13,9 +13,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const JwkSecretKey = "jwk"
-const SecretLabelKey = "type"
-const SecretLabelType = "jwker.nais.io"
+const TokenXPrivateJwkKey = "TOKEN_X_PRIVATE_JWK"
+const TokenXWellKnownUrlKey = "TOKEN_X_WELL_KNOWN_URL"
+const TokenXClientIdKey = "TOKEN_X_CLIENT_ID"
+const TokenXSecretLabelKey = "type"
+const TokenXSecretLabelType = "jwker.nais.io"
+
+type PodSecretData struct {
+	ClientId               tokendings.ClientId
+	Jwk                    jose.JSONWebKey
+	TokenDingsWellKnownUrl string
+}
 
 func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
 	keysLen := len(jwks.Keys)
@@ -27,22 +35,15 @@ func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
 
 func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 	jwk := jose.JSONWebKey{}
-	err := json.Unmarshal(sec.Data[JwkSecretKey], &jwk)
+	err := json.Unmarshal(sec.Data[TokenXPrivateJwkKey], &jwk)
 	return &jwk, err
 }
 
-func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) (corev1.Secret, error) {
-	jwk, err := FirstJWK(clientPrivateJwks)
+func CreateSecretSpec(secretName string, data PodSecretData) (corev1.Secret, error) {
+	stringdata, err := stringData(data)
 	if err != nil {
 		return corev1.Secret{}, err
 	}
-
-	clientPrivateJwkJson, err := json.MarshalIndent(jwk, "", "")
-	if err != nil {
-		return corev1.Secret{}, err
-	}
-
-	stringdata := map[string]string{JwkSecretKey: string(clientPrivateJwkJson)}
 
 	return corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -51,16 +52,16 @@ func CreateSecretSpec(app tokendings.ClientId, secretName string, clientPrivateJ
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: app.Namespace,
-			Labels:    map[string]string{"app": app.Name, SecretLabelKey: SecretLabelType},
+			Namespace: data.ClientId.Namespace,
+			Labels:    map[string]string{"app": data.ClientId.Name, TokenXSecretLabelKey: TokenXSecretLabelType},
 		},
 		StringData: stringdata,
 		Type:       "Opaque",
 	}, nil
 }
 
-func CreateSecret(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string, clientPrivateJwks jose.JSONWebKeySet) error {
-	secretSpec, err := CreateSecretSpec(app, secretName, clientPrivateJwks)
+func CreateSecret(cli client.Client, ctx context.Context, secretName string, data PodSecretData) error {
+	secretSpec, err := CreateSecretSpec(secretName, data)
 	if err != nil {
 		return fmt.Errorf("Unable to create secretSpec object: %s", err)
 	}
@@ -97,9 +98,25 @@ func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Cli
 	var mLabels = client.MatchingLabels{}
 
 	mLabels["app"] = app.Name
-	mLabels[SecretLabelKey] = SecretLabelType
+	mLabels[TokenXSecretLabelKey] = TokenXSecretLabelType
 	if err := cli.List(ctx, &secrets, client.InNamespace(app.Namespace), mLabels); err != nil {
 		return secrets, err
 	}
 	return secrets, nil
+}
+
+func stringData(data PodSecretData) (map[string]string, error) {
+	jwkJson, err := json.Marshal(data.Jwk)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal private JWK: %w", err)
+	}
+	return map[string]string{
+		TokenXPrivateJwkKey:   string(jwkJson),
+		TokenXClientIdKey:     data.ClientId.String(),
+		TokenXWellKnownUrlKey: data.TokenDingsWellKnownUrl,
+	}, nil
+}
+
+func WellKnownUrl(baseUrl string) string {
+	return fmt.Sprintf("%s/.well-known/oauth-authorization-server", baseUrl)
 }
