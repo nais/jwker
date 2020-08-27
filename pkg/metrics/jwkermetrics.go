@@ -44,7 +44,7 @@ func RefreshTotalJwkerClusterMetrics(cli client.Client) error {
 
 	t := time.NewTicker(exp)
 	for range t.C {
-		log.Info("Fetching metrics from cluster")
+		log.Debug("Fetching metrics from cluster")
 		if err = cli.List(ctx, &secretList, mLabels); err != nil {
 			return err
 		}
