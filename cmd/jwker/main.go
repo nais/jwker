@@ -2,6 +2,9 @@ package main
 
 import (
 	"flag"
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"os"
 
@@ -10,7 +13,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	jwkerv1 "github.com/nais/jwker/api/v1"
@@ -72,7 +74,12 @@ func main() {
 	flag.StringVar(&clusterName, "clusterName", os.Getenv("CLUSTER_NAME"), "nais cluster")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	zapLogger, err := setupZapLogger()
+	if err != nil {
+		setupLog.Error(err, "unable to set up logger")
+		os.Exit(1)
+	}
+	ctrl.SetLogger(zapr.NewLogger(zapLogger))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -119,4 +126,12 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func setupZapLogger() (*zap.Logger, error) {
+	loggerConfig := zap.NewProductionConfig()
+	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	loggerConfig.EncoderConfig.TimeKey = "timestamp"
+	loggerConfig.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+	return loggerConfig.Build()
 }
