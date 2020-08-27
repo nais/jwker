@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"github.com/go-logr/zapr"
+	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +36,12 @@ func init() {
 		jwkermetrics.JwkersProcessedCount,
 		jwkermetrics.JwkerSecretsTotal,
 	)
+
+	formatter := log.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+	}
+	log.SetFormatter(&formatter)
+	log.SetLevel(log.DebugLevel)
 
 	_ = clientgoscheme.AddToScheme(scheme)
 
