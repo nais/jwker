@@ -3,17 +3,19 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/nais/jwker/pkg/tokendings"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const OldJwksKey = "jwks"
+const OldJwkKey = "jwk"
 const TokenXPrivateJwkKey = "TOKEN_X_PRIVATE_JWK"
 const TokenXWellKnownUrlKey = "TOKEN_X_WELL_KNOWN_URL"
 const TokenXClientIdKey = "TOKEN_X_CLIENT_ID"
@@ -35,22 +37,44 @@ func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
 }
 
 func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
-	jwk := jose.JSONWebKey{}
-	err := json.Unmarshal(sec.Data[TokenXPrivateJwkKey], &jwk)
-	if err != nil {
+	jwk := &jose.JSONWebKey{}
+
+	jwkBytes, found := sec.Data[TokenXPrivateJwkKey]
+
+	if !found {
 		return extractOldJwk(sec)
 	}
-	return &jwk, err
+
+	if err := json.Unmarshal(jwkBytes, jwk); err != nil {
+		return nil, err
+	}
+
+	return jwk, nil
 }
 
 //temporary func to handle renaming/changes to expected jwker secret
 func extractOldJwk(sec corev1.Secret) (*jose.JSONWebKey, error) {
-	jwks := jose.JSONWebKeySet{}
-	err := json.Unmarshal(sec.Data[OldJwksKey], &jwks)
-	if err != nil {
-		return nil, err
+	jwks := &jose.JSONWebKeySet{}
+	oldJwksBytes, found := sec.Data[OldJwksKey]
+
+	if found {
+		if err := json.Unmarshal(oldJwksBytes, jwks); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal '%s' from secret '%s': %w", OldJwksKey, sec.Name, err)
+		}
+		return FirstJWK(*jwks)
 	}
-	return FirstJWK(jwks)
+
+	jwk := &jose.JSONWebKey{}
+	oldJwkBytes, found := sec.Data[OldJwkKey]
+
+	if found {
+		if err := json.Unmarshal(oldJwkBytes, jwk); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal '%s' from secret '%s': %w", OldJwkKey, sec.Name, err)
+		}
+		return jwk, nil
+	}
+
+	return nil, errors.New(fmt.Sprintf("failed to find any expected keys in secret '%s'", sec.Name))
 }
 
 func CreateSecretSpec(secretName string, data PodSecretData) (corev1.Secret, error) {
@@ -81,7 +105,7 @@ func CreateSecret(cli client.Client, ctx context.Context, secretName string, dat
 	}
 
 	err = cli.Create(ctx, &secretSpec)
-	if errors.IsAlreadyExists(err) {
+	if k8serrors.IsAlreadyExists(err) {
 		err = cli.Update(ctx, &secretSpec)
 	}
 
@@ -100,7 +124,7 @@ func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings
 	for _, clusterSecret := range secretList.Items {
 		if clusterSecret.Name != secretName {
 			if err := cli.Delete(ctx, &clusterSecret); err != nil {
-				return fmt.Errorf("Unable to delete clusterSecret: %s", err)
+				return fmt.Errorf("unable to delete clusterSecret: %w", err)
 			}
 		}
 	}
