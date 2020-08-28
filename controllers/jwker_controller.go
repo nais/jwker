@@ -322,8 +322,9 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// delete unused secrets from cluster
 	for _, oldSecret := range tx.secretLists.Unused.Items {
-		err = r.Delete(tx.ctx, &oldSecret)
-		r.logger.Error(err, "failed deletion")
+		if err := r.Delete(tx.ctx, &oldSecret); err != nil {
+			r.logger.Error(err, "failed deletion")
+		}
 	}
 
 	return ctrl.Result{}, nil
