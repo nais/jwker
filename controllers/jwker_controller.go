@@ -250,6 +250,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	jwkermetrics.JwkersProcessedCount.Inc()
 
 	if r.TokendingsToken == nil {
+		r.reportError(nil, "no tokendings token found")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
@@ -265,13 +266,13 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if err == nil {
 			return ctrl.Result{}, nil
 		}
-		r.logger.Error(err, "failed purge")
+		r.reportError(err, "failed purge")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, err
 
 	case err != nil:
-		r.logger.Error(err, "unable to get jwker resource from cluster")
+		r.reportError(err, "unable to get jwker resource from cluster")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
@@ -279,6 +280,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	hash, err = jwker.Spec.Hash()
 	if err != nil {
+		r.reportError(err, "failed to calculate hash")
 		return ctrl.Result{}, err
 	}
 	if jwker.Status.SynchronizationHash == hash {
@@ -301,7 +303,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	tx, err := r.prepare(ctx, req)
 	if err != nil {
 		jwker.Status.SynchronizationState = jwkerv1.EventFailedPrepare
-		r.logger.Error(err, "failed prepare jwks")
+		r.reportError(err, "failed prepare jwks")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
@@ -311,7 +313,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	err = r.create(*tx)
 	if err != nil {
 		jwker.Status.SynchronizationState = jwkerv1.EventFailedSynchronization
-		r.logger.Error(err, "failed synchronization")
+		r.reportError(err, "failed synchronization")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
@@ -328,6 +330,11 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *JwkerReconciler) reportError(err error, message string) {
+	r.logger.Error(err, message)
+	jwkermetrics.JwkersProcessingFailedCount.Inc()
 }
 
 func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {

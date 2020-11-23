@@ -35,6 +35,7 @@ func init() {
 		jwkermetrics.JwkersTotal,
 		jwkermetrics.JwkersProcessedCount,
 		jwkermetrics.JwkerSecretsTotal,
+		jwkermetrics.JwkersProcessingFailedCount,
 	)
 
 	formatter := log.JSONFormatter{

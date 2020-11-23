@@ -29,6 +29,12 @@ var (
 			Help: "Number of jwker secrets total",
 		},
 	)
+	JwkersProcessingFailedCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "jwker_processing_failed_count",
+			Help: "Number of jwkers that failed to process",
+		},
+	)
 
 	ctx = context.Background()
 )
