@@ -3,9 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"time"
-
 	"github.com/go-logr/logr"
 	jwkerv1 "github.com/nais/jwker/api/v1"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
@@ -18,8 +15,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"net/url"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
 
 const (
@@ -250,7 +249,6 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	jwkermetrics.JwkersProcessedCount.Inc()
 
 	if r.TokendingsToken == nil {
-		r.reportError(nil, "no tokendings token found")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
