@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	jwkerv1 "github.com/nais/jwker/api/v1"
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"

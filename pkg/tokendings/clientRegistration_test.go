@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/dgrijalva/jwt-go"
-	jwkerv1 "github.com/nais/jwker/api/v1"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

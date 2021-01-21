@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	jwkerv1 "github.com/nais/jwker/api/v1"
 	"github.com/nais/jwker/controllers"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

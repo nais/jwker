@@ -17,9 +17,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	jwkerv1 "github.com/nais/jwker/api/v1"
 	"github.com/nais/jwker/controllers"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	// +kubebuilder:scaffold:imports
 )
 
