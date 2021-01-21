@@ -1,6 +1,6 @@
 module github.com/nais/jwker
 
-go 1.13
+go 1.15
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -15,6 +15,7 @@ require (
 	go.uber.org/zap v1.15.0
 	gopkg.in/square/go-jose.v2 v2.5.0
 	k8s.io/api v0.17.2
+	k8s.io/apiextensions-apiserver v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v0.17.2
 	sigs.k8s.io/controller-runtime v0.5.0
