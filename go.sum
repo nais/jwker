@@ -234,6 +234,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f/go.mod h1:ZdcZmHo+o7JKHSa8/e818NopupXU1YMK5fe1lsApnBw=
 github.com/nais/liberator v0.0.0-20210121133241-30cdca8d4c12 h1:Bgr9F3Tb+9m40d8JvaeIvZIwVgz7VKZa+M+Rprztfwo=
 github.com/nais/liberator v0.0.0-20210121133241-30cdca8d4c12/go.mod h1:w8c3MFXFPyt1yNZD+rSDCfG7DP54tVjiCY1fIa+v4w0=
+github.com/nais/liberator v0.0.0-20210122132806-ad3abd86081c h1:5a8gk9VA2e5OOoTRCxLCHNVAir9OP3gBttOGVPCmzCE=
+github.com/nais/liberator v0.0.0-20210122132806-ad3abd86081c/go.mod h1:w8c3MFXFPyt1yNZD+rSDCfG7DP54tVjiCY1fIa+v4w0=
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=

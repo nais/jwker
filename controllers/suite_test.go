@@ -14,12 +14,11 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	"github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // for side effects only
 	"k8s.io/client-go/rest"
@@ -188,38 +187,10 @@ func fixtures(cli client.Client) error {
 func TestReconciler(t *testing.T) {
 	ctx := context.Background()
 
-	// FIXME: this is out of sync with upstream.
-	// FIXME: FIND A BETTER WAY TO DETERMINE THE STRUCTURE OF THE CRD
-	crd := &v1beta1.CustomResourceDefinition{
-		TypeMeta: v1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1beta1",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name: "jwkers.nais.io",
-		},
-		Spec: v1beta1.CustomResourceDefinitionSpec{
-			Group:   "nais.io",
-			Version: "v1",
-			Names:   v1beta1.CustomResourceDefinitionNames{
-				Plural:     "jwkers",
-				Singular:   "jwker",
-				Kind:       "Jwker",
-				ListKind:   "JwkerList",
-			},
-			Scope:   "Namespaced",
-			Versions: []v1beta1.CustomResourceDefinitionVersion{
-				{
-					Name:    "v1",
-					Served:  true,
-					Storage: true,
-				},
-			},
-		},
-	}
+	crdPath := crd.YamlDirectory()
 
 	testEnv = &envtest.Environment{
-		CRDs: []runtime.Object{crd},
+		CRDDirectoryPaths: []string{crdPath},
 	}
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
