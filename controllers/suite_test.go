@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"path/filepath"
-	"reflect"
-	runtime2 "runtime"
 	"testing"
 	"time"
 
@@ -17,6 +14,7 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	"github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/crd"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -189,7 +187,7 @@ func fixtures(cli client.Client) error {
 func TestReconciler(t *testing.T) {
 	ctx := context.Background()
 
-	crdPath := findCrdPath()
+	crdPath := crd.YamlDirectory()
 
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{crdPath},
@@ -301,16 +299,6 @@ func TestReconciler(t *testing.T) {
 
 	err = testEnv.Stop()
 	assert.NoError(t, err)
-}
-
-// Hackish, but finds the CRD yamls in the liberator repo
-func findCrdPath() string {
-	spec := nais_io_v1.JwkerSpec{}
-	v := reflect.ValueOf(spec.Hash)
-	fp := runtime2.FuncForPC(v.Pointer())
-	file, _ := fp.FileLine(fp.Entry())
-	crdPath := filepath.Clean(filepath.Join(filepath.Dir(file), "../../../../config/crd/bases"))
-	return crdPath
 }
 
 func getSecret(ctx context.Context, cli client.Client, namespace, name string) (*corev1.Secret, error) {

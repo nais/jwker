@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/go-logr/zapr v0.1.0
 	github.com/google/uuid v1.1.1
-	github.com/nais/liberator v0.0.0-20210121133241-30cdca8d4c12
+	github.com/nais/liberator v0.0.0-20210122132806-ad3abd86081c
 	github.com/prometheus/client_golang v1.0.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/pflag v1.0.5
