@@ -81,9 +81,7 @@ func fixtures(cli client.Client) error {
 			},
 			Spec: nais_io_v1.JwkerSpec{
 				SecretName: secretName,
-				AccessPolicy: &nais_io_v1.AccessPolicy{
-					Inbound: &nais_io_v1.AccessPolicyInbound{},
-				},
+				AccessPolicy: &nais_io_v1.AccessPolicy{},
 			},
 		},
 	)
