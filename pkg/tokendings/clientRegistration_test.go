@@ -38,13 +38,20 @@ var test = clientRegistrationTest{
 							Namespace:   "othernamespace",
 							Cluster:     "mycluster",
 						},
+						{
+							Application: "otherapplicationinsamecluster",
+							Namespace:   "othernamespace",
+						},
+						{
+							Application: "otherapplicationinsamenamespace",
+						},
 					},
 				},
 			},
 		},
 	},
 	clientName:        "mycluster:mynamespace:myapplication",
-	softwareStatement: `{"accessPolicyInbound":["mycluster:othernamespace:otherapplication"],"accessPolicyOutbound":[],"appId":"mycluster:mynamespace:myapplication"}`,
+	softwareStatement: `{"accessPolicyInbound":["mycluster:othernamespace:otherapplication","mycluster:othernamespace:otherapplicationinsamecluster","mycluster:mynamespace:otherapplicationinsamenamespace"],"accessPolicyOutbound":[],"appId":"mycluster:mynamespace:myapplication"}`,
 }
 
 func TestMakeClientRegistration(t *testing.T) {

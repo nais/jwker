@@ -134,11 +134,13 @@ func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement
 	}
 	if jwker.Spec.AccessPolicy.Inbound != nil {
 		for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
+			ensureValidRule(&rule, appId)
 			inbound = append(inbound, fmt.Sprintf("%s:%s:%s", rule.Cluster, rule.Namespace, rule.Application))
 		}
 	}
 	if jwker.Spec.AccessPolicy.Outbound != nil {
 		for _, rule := range jwker.Spec.AccessPolicy.Outbound.Rules {
+			ensureValidRule(&rule, appId)
 			outbound = append(outbound, fmt.Sprintf("%s:%s:%s", rule.Cluster, rule.Namespace, rule.Application))
 		}
 	}
@@ -147,4 +149,13 @@ func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement
 		AccessPolicyInbound:  inbound,
 		AccessPolicyOutbound: outbound,
 	}, nil
+}
+
+func ensureValidRule(rule *v1.AccessPolicyRule, appId ClientId) {
+	if len(rule.Namespace) == 0 {
+		rule.Namespace = appId.Namespace
+	}
+	if len(rule.Cluster) == 0 {
+		rule.Cluster = appId.Cluster
+	}
 }
