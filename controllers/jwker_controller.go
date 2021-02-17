@@ -18,6 +18,7 @@ import (
 	"net/url"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 	"time"
 )
 
@@ -256,7 +257,11 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if jwker.Status.SynchronizationState == jwkerv1.EventFailedSynchronization || jwker.Status.SynchronizationState == jwkerv1.EventFailedPrepare {
 			return
 		}
-		err := r.Update(ctx, &jwker)
+
+		err := r.updateJwker(ctx, jwker, func(existing *jwkerv1.Jwker) error {
+			existing.Status = jwker.Status
+			return r.Update(ctx, existing)
+		})
 		if err != nil {
 			r.logger.Error(err, "failed writing status")
 		}
@@ -295,6 +300,22 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	return ctrl.Result{}, nil
 }
+
+var jwkersync sync.Mutex
+
+func (r *JwkerReconciler) updateJwker(ctx context.Context, jwker jwkerv1.Jwker, updateFunc func(existing *jwkerv1.Jwker) error) error {
+	jwkersync.Lock()
+	defer jwkersync.Unlock()
+
+	existing := &jwkerv1.Jwker{}
+	err := r.Get(ctx, client.ObjectKey{Namespace: jwker.GetNamespace(), Name: jwker.GetName()}, existing)
+	if err != nil {
+		return fmt.Errorf("get newest version of Jwker: %s", err)
+	}
+
+	return updateFunc(existing)
+}
+
 
 func (r *JwkerReconciler) shouldUpdateSecrets(jwker jwkerv1.Jwker) bool {
 	return jwker.Spec.SecretName != jwker.Status.SynchronizationSecretName
