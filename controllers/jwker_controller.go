@@ -10,9 +10,9 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/kubernetes"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"net/url"
@@ -98,56 +98,12 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 	return nil
 }
 
-type secretLists struct {
-	Used   corev1.SecretList
-	Unused corev1.SecretList
-}
-
 type transaction struct {
 	ctx         context.Context
 	req         ctrl.Request
 	keyset      utils.KeySet
-	secretLists secretLists
+	secretLists kubernetes.SecretLists
 	jwker       jwkerv1.Jwker
-}
-
-func secretInPod(secret corev1.Secret, pod corev1.Pod) bool {
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Secret != nil && volume.Secret.SecretName == secret.Name {
-			return true
-		}
-	}
-	return false
-}
-
-func secretInPods(secret corev1.Secret, pods corev1.PodList) bool {
-	for _, pod := range pods.Items {
-		if secretInPod(secret, pod) {
-			return true
-		}
-	}
-	return false
-}
-
-func podSecretLists(secrets corev1.SecretList, pods corev1.PodList) secretLists {
-	lists := secretLists{
-		Used: corev1.SecretList{
-			Items: make([]corev1.Secret, 0),
-		},
-		Unused: corev1.SecretList{
-			Items: make([]corev1.Secret, 0),
-		},
-	}
-
-	for _, sec := range secrets.Items {
-		if secretInPods(sec, pods) {
-			lists.Used.Items = append(lists.Used.Items, sec)
-		} else {
-			lists.Unused.Items = append(lists.Unused.Items, sec)
-		}
-	}
-
-	return lists
 }
 
 func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker jwkerv1.Jwker) (*transaction, error) {
@@ -166,7 +122,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 	}
 
 	// find intersect between secrets in use by deployment and all jwker managed secrets
-	secrets := podSecretLists(allSecrets, *podList)
+	secrets := kubernetes.ListUsedAndUnusedSecretsForPods(allSecrets, *podList)
 
 	existingJwks := jose.JSONWebKeySet{}
 
