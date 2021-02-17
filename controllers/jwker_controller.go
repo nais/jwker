@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
@@ -143,6 +144,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 	}
 
 	if r.shouldUpdateSecrets(jwker) || newJwk.Key == nil {
+		r.logger.Info("Generating new JWK")
 		newJwk, err = utils.GenerateJWK()
 		if err != nil {
 			return nil, err
@@ -210,6 +212,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	hash := ""
+	correlationId := uuid.New().String()
 	var jwker jwkerv1.Jwker
 
 	jwkermetrics.JwkersProcessedCount.Inc()
@@ -220,7 +223,12 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}, nil
 	}
 
-	r.logger = r.Log.WithValues("jwker", req.NamespacedName)
+	r.logger = r.Log.WithValues(
+		"jwker", req.NamespacedName,
+		"jwker_name", req.Name,
+		"jwker_namespace", req.Namespace,
+		"correlation_id", correlationId,
+	)
 
 	// purge other systems if resource was deleted
 	err := r.Get(ctx, req.NamespacedName, &jwker)
@@ -315,7 +323,6 @@ func (r *JwkerReconciler) updateJwker(ctx context.Context, jwker jwkerv1.Jwker, 
 
 	return updateFunc(existing)
 }
-
 
 func (r *JwkerReconciler) shouldUpdateSecrets(jwker jwkerv1.Jwker) bool {
 	return jwker.Spec.SecretName != jwker.Status.SynchronizationSecretName
