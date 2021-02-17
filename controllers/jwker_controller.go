@@ -150,7 +150,7 @@ func podSecretLists(secrets corev1.SecretList, pods corev1.PodList) secretLists 
 	return lists
 }
 
-func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*transaction, error) {
+func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker jwkerv1.Jwker) (*transaction, error) {
 	app := r.appClientID(req)
 
 	// fetch running pods for this app
@@ -168,22 +168,31 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request) (*trans
 	// find intersect between secrets in use by deployment and all jwker managed secrets
 	secrets := podSecretLists(allSecrets, *podList)
 
-	newJwk, err := utils.GenerateJWK()
-	if err != nil {
-		return nil, err
-	}
+	existingJwks := jose.JSONWebKeySet{}
 
-	jwks := jose.JSONWebKeySet{}
+	var newJwk jose.JSONWebKey
 
 	for _, sec := range secrets.Used.Items {
 		jwk, err := secret.ExtractJWK(sec)
 		if err != nil {
 			return nil, err
 		}
-		jwks.Keys = append(jwks.Keys, *jwk)
+
+		if sec.Name == jwker.Status.SynchronizationSecretName {
+			newJwk = *jwk
+		} else {
+			existingJwks.Keys = append(existingJwks.Keys, *jwk)
+		}
 	}
 
-	keyset := utils.KeySetWithExisting(newJwk, jwks.Keys)
+	if r.shouldUpdateSecrets(jwker) || newJwk.Key == nil {
+		newJwk, err = utils.GenerateJWK()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	keyset := utils.KeySetWithExisting(newJwk, existingJwks.Keys)
 
 	return &transaction{
 		ctx:         ctx,
@@ -298,7 +307,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}()
 
 	// prepare and commit
-	tx, err := r.prepare(ctx, req)
+	tx, err := r.prepare(ctx, req, jwker)
 	if err != nil {
 		jwker.Status.SynchronizationState = jwkerv1.EventFailedPrepare
 		r.reportError(err, "failed prepare jwks")
@@ -319,6 +328,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	jwker.Status.SynchronizationState = jwkerv1.EventRolloutComplete
 	jwker.Status.SynchronizationHash = hash
+	jwker.Status.SynchronizationSecretName = tx.jwker.Spec.SecretName
 
 	// delete unused secrets from cluster
 	for _, oldSecret := range tx.secretLists.Unused.Items {
@@ -328,6 +338,10 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *JwkerReconciler) shouldUpdateSecrets(jwker jwkerv1.Jwker) bool {
+	return jwker.Spec.SecretName != jwker.Status.SynchronizationSecretName
 }
 
 func (r *JwkerReconciler) reportError(err error, message string) {
