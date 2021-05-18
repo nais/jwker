@@ -9,10 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nais/jwker/controllers"
-	"github.com/nais/jwker/pkg/secret"
-	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 	"github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +21,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	"github.com/nais/jwker/controllers"
+	"github.com/nais/jwker/pkg/secret"
+	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/nais/jwker/utils"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -80,7 +81,7 @@ func fixtures(cli client.Client) error {
 				Namespace: namespace,
 			},
 			Spec: nais_io_v1.JwkerSpec{
-				SecretName: secretName,
+				SecretName:   secretName,
 				AccessPolicy: &nais_io_v1.AccessPolicy{},
 			},
 		},
@@ -224,6 +225,8 @@ func TestReconciler(t *testing.T) {
 		Client:           cli,
 		ClusterName:      "local",
 		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Reader:           mgr.GetAPIReader(),
+		Recorder:         mgr.GetEventRecorderFor("jwker"),
 		Scheme:           mgr.GetScheme(),
 		TokenDingsUrl:    "http://" + listener.Addr().String(),
 		TokendingsToken:  &tokendings.TokenResponse{},

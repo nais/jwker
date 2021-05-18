@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
+	"os"
+	"time"
+
 	"github.com/go-logr/zapr"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"io/ioutil"
-	"os"
-	"time"
 
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -17,9 +18,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+
 	"github.com/nais/jwker/controllers"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
-	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -113,6 +115,8 @@ func main() {
 		ClusterName:        clusterName,
 		Endpoint:           authProviderURL,
 		Log:                ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Reader:             mgr.GetAPIReader(),
+		Recorder:           mgr.GetEventRecorderFor("Jwker"),
 		Scheme:             mgr.GetScheme(),
 		TokenDingsUrl:      tokenDingsUrl,
 		TokendingsClientID: tokenDingsClientId,
