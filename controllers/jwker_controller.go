@@ -250,7 +250,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	err = r.Get(ctx, req.NamespacedName, &jwker)
 	switch {
 	case errors.IsNotFound(err):
-		if inSharedNamespace || len(jwker.Status.SynchronizationHash) == 0 {
+		if inSharedNamespace {
 			return ctrl.Result{}, nil
 		}
 		err := r.purge(ctx, req)
