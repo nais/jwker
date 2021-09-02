@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
+	"github.com/golang-jwt/jwt/v4"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/nais/jwker/utils"
 )
 
 type clientRegistrationTest struct {

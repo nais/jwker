@@ -8,10 +8,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
+
+	"github.com/nais/jwker/pkg/tokendings"
 )
 
 var (
