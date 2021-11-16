@@ -32,6 +32,8 @@ import (
 var cfg *rest.Config
 var cli client.Client
 var testEnv *envtest.Environment
+var ctx context.Context
+var cancel context.CancelFunc
 
 const appName = "app1"
 const secretName = "app1-secret-foobar"
@@ -184,8 +186,6 @@ func fixtures(cli client.Client) error {
 }
 
 func TestReconciler(t *testing.T) {
-	ctx := context.Background()
-
 	crdPath := crd.YamlDirectory()
 
 	testEnv = &envtest.Environment{
@@ -242,8 +242,10 @@ func TestReconciler(t *testing.T) {
 		return
 	}
 
+	ctx, cancel = context.WithCancel(context.Background())
+
 	go func() {
-		err = mgr.Start(ctrl.SetupSignalHandler())
+		err = mgr.Start(ctx)
 		if err != nil {
 			panic(err)
 		}
@@ -297,6 +299,7 @@ func TestReconciler(t *testing.T) {
 	assert.NoError(t, waitForDeletedSecret(ctx, cli, namespace, secretName))
 	assert.NoError(t, waitForDeletedSecret(ctx, cli, namespace, alreadyInUseSecret))
 
+	cancel()
 	err = testEnv.Stop()
 	assert.NoError(t, err)
 }
