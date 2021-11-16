@@ -99,7 +99,7 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 	}
 
 	r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from cluster", req.Name, req.Namespace))
-	if err := secret.DeleteClusterSecrets(r, ctx, aid, ""); err != nil {
+	if err := secret.DeleteClusterSecrets(r.Client, ctx, aid, ""); err != nil {
 		return fmt.Errorf("deleting secrets from cluster: %s", err)
 	}
 	jwkermetrics.JwkerSecretsTotal.Dec()
@@ -206,7 +206,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		TokenDingsWellKnownUrl: secret.WellKnownUrl(r.TokenDingsUrl),
 	}
 
-	if err := secret.CreateSecret(r, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
+	if err := secret.CreateSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
 		return fmt.Errorf("reconciling secrets: %s", err)
 	}
 
@@ -216,8 +216,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 // +kubebuilder:rbac:groups=nais.io,resources=jwkers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=nais.io,resources=jwkers/status,verbs=get;update;patch
 
-func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	hash := ""
 	correlationId := uuid.New().String()
 	var jwker jwkerv1.Jwker
@@ -237,7 +236,7 @@ func (r *JwkerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		"correlation_id", correlationId,
 	)
 
-	namespaceValidator := namespaces.NewValidator(r.Reader, r.logger)
+	namespaceValidator := namespaces.NewValidator(r.Client, r.logger)
 	inSharedNamespace, err := namespaceValidator.InSharedNamespace(ctx, req.Namespace)
 	if err != nil {
 		r.reportError(err, "failed validating namespace")

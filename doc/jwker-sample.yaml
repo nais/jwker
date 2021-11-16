@@ -1,0 +1,18 @@
+apiVersion: nais.io/v1
+kind: Jwker
+metadata:
+  name: app1
+  namespace: myteam
+spec:
+  accessPolicy:
+    inbound:
+      rules:
+      - application: app2
+        cluster: balls
+        namespace: test
+    outbound:
+      rules:
+      - application: app2
+        cluster: balls
+        namespace: test
+  secretName: app1

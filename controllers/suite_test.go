@@ -225,7 +225,6 @@ func TestReconciler(t *testing.T) {
 		Client:           cli,
 		ClusterName:      "local",
 		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Reader:           mgr.GetAPIReader(),
 		Recorder:         mgr.GetEventRecorderFor("jwker"),
 		Scheme:           mgr.GetScheme(),
 		TokenDingsUrl:    "http://" + listener.Addr().String(),

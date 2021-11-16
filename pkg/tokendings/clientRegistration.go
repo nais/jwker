@@ -133,7 +133,7 @@ func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement
 		return nil, fmt.Errorf("no access policy")
 	}
 	if jwker.Spec.AccessPolicy.Inbound != nil {
-		for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules {
+		for _, rule := range jwker.Spec.AccessPolicy.Inbound.Rules.GetRules() {
 			ensureValidRule(&rule, appId)
 			inbound = append(inbound, fmt.Sprintf("%s:%s:%s", rule.Cluster, rule.Namespace, rule.Application))
 		}

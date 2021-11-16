@@ -20,40 +20,48 @@ type clientRegistrationTest struct {
 	softwareStatement string
 }
 
-var test = clientRegistrationTest{
-	input: jwkerv1.Jwker{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Jwker",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "myapplication",
-			Namespace: "mynamespace",
-		},
-		Spec: jwkerv1.JwkerSpec{
-			AccessPolicy: &jwkerv1.AccessPolicy{
-				Inbound: &jwkerv1.AccessPolicyInbound{
-					Rules: []jwkerv1.AccessPolicyRule{
-						{
-							Application: "otherapplication",
-							Namespace:   "othernamespace",
-							Cluster:     "mycluster",
-						},
-						{
-							Application: "otherapplicationinsamecluster",
-							Namespace:   "othernamespace",
-						},
-						{
-							Application: "otherapplicationinsamenamespace",
+var (
+	test = clientRegistrationTest{
+		input: jwkerv1.Jwker{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Jwker",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myapplication",
+				Namespace: "mynamespace",
+			},
+			Spec: jwkerv1.JwkerSpec{
+				AccessPolicy: &jwkerv1.AccessPolicy{
+					Inbound: &jwkerv1.AccessPolicyInbound{
+						Rules: []jwkerv1.AccessPolicyInboundRule{
+							{
+								AccessPolicyRule: jwkerv1.AccessPolicyRule{
+									Application: "otherapplication",
+									Namespace:   "othernamespace",
+									Cluster:     "mycluster",
+								},
+							},
+							{
+								AccessPolicyRule: jwkerv1.AccessPolicyRule{
+									Application: "otherapplicationinsamecluster",
+									Namespace:   "othernamespace",
+								},
+							},
+							{
+								AccessPolicyRule: jwkerv1.AccessPolicyRule{
+									Application: "otherapplicationinsamenamespace",
+								},
+							},
 						},
 					},
 				},
 			},
 		},
-	},
-	clientName:        "mycluster:mynamespace:myapplication",
-	softwareStatement: `{"accessPolicyInbound":["mycluster:othernamespace:otherapplication","mycluster:othernamespace:otherapplicationinsamecluster","mycluster:mynamespace:otherapplicationinsamenamespace"],"accessPolicyOutbound":[],"appId":"mycluster:mynamespace:myapplication"}`,
-}
+		clientName:        "mycluster:mynamespace:myapplication",
+		softwareStatement: `{"accessPolicyInbound":["mycluster:othernamespace:otherapplication","mycluster:othernamespace:otherapplicationinsamecluster","mycluster:mynamespace:otherapplicationinsamenamespace"],"accessPolicyOutbound":[],"appId":"mycluster:mynamespace:myapplication"}`,
+	}
+)
 
 func TestMakeClientRegistration(t *testing.T) {
 	signkey, err := utils.GenerateJWK()
