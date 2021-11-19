@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/nais/jwker/pkg/secret"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -45,7 +46,7 @@ func RefreshTotalJwkerClusterMetrics(cli client.Client) error {
 
 	var secretList v1.SecretList
 	var mLabels = client.MatchingLabels{}
-	mLabels["type"] = "nais.io"
+	mLabels["type"] = secret.TokenXSecretLabelType
 	var jwkerList jwkerv1.JwkerList
 
 	t := time.NewTicker(exp)
