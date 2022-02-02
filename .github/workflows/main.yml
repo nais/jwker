@@ -17,10 +17,12 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ env.GOVERSION }}
-
+      - name: Setup Test
+        run: |
+          make kubebuilder
       - name: Test Go
         run: |
-          make kubebuilder && make test
+          make test
   build:
     needs:
       - test
