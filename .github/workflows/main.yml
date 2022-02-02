@@ -20,7 +20,7 @@ jobs:
 
       - name: Test Go
         run: |
-          make test
+          make kubebuilder && make test
   build:
     needs:
       - test
