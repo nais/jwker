@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout latest code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Extract version of Go to use
         run: echo "GOVERSION=$(cat go.mod | grep -w "go" | awk ' { print $2 } ' | grep -w "^[^v]")" >> $GITHUB_ENV
       - name: Set up Go
@@ -30,7 +30,7 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Generate image environment variable
         run: |
           version=$(./version.sh)
@@ -52,7 +52,7 @@ jobs:
     needs: build
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         path: jwker
     - uses: navikt/github-app-token-generator@v1
@@ -62,7 +62,7 @@ jobs:
         app-id: ${{ secrets.NAIS_APP_ID }}
         repo: navikt/nais-yaml
     - name: Checkout nais-yaml
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: navikt/nais-yaml
         token: ${{ steps.get-token.outputs.token }}
