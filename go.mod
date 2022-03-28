@@ -3,7 +3,7 @@ module github.com/nais/jwker
 go 1.17
 
 require (
-	github.com/go-logr/logr v1.2.2
+	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
 	github.com/golang-jwt/jwt/v4 v4.4.0
 	github.com/google/uuid v1.3.0
