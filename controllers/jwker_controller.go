@@ -13,7 +13,6 @@ import (
 	"github.com/nais/liberator/pkg/kubernetes"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -21,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
-	"github.com/nais/jwker/pkg/namespaces"
 	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
@@ -236,22 +234,10 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		"correlation_id", correlationId,
 	)
 
-	namespaceValidator := namespaces.NewValidator(r.Client, r.logger)
-	inSharedNamespace, err := namespaceValidator.InSharedNamespace(ctx, req.Namespace)
-	if err != nil {
-		r.reportError(err, "failed validating namespace")
-		return ctrl.Result{
-			RequeueAfter: requeueInterval,
-		}, nil
-	}
-
 	// purge other systems if resource was deleted
-	err = r.Get(ctx, req.NamespacedName, &jwker)
+	err := r.Get(ctx, req.NamespacedName, &jwker)
 	switch {
 	case errors.IsNotFound(err):
-		if inSharedNamespace {
-			return ctrl.Result{}, nil
-		}
 		err := r.purge(ctx, req)
 		if err == nil {
 			return ctrl.Result{}, nil
@@ -292,15 +278,6 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			r.logger.Error(err, "failed writing status")
 		}
 	}()
-
-	if inSharedNamespace {
-		jwker.Status.SynchronizationState = jwkerv1.EventNotInTeamNamespace
-		jwker.Status.SynchronizationHash = hash
-		msg := fmt.Sprintf("ERROR: Expected resource in team namespace, but was found in namespace '%s'. Jwker/TokenX client and secrets will not be processed.", req.Namespace)
-		r.logger.Error(nil, msg)
-		r.Recorder.Event(&jwker, v1.EventTypeWarning, jwkerv1.EventNotInTeamNamespace, msg)
-		return ctrl.Result{}, nil
-	}
 
 	// prepare and commit
 	tx, err := r.prepare(ctx, req, jwker)
