@@ -54,6 +54,12 @@ func New(ctx context.Context) (*Config, error) {
 	tokendingsWellKnownURL.Path = path.Join(tokendingsWellKnownURL.Path, oauth.WellKnownOAuthPath)
 	cfg.Tokendings.WellKnownURL = tokendingsWellKnownURL.String()
 
+	tokendingsMetadata, err := oauth.Metadata(cfg.Tokendings.WellKnownURL).OAuth(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching metadata from tokendings: %w", err)
+	}
+	cfg.Tokendings.Metadata = tokendingsMetadata
+
 	authProviderMetadata, err := oauth.Metadata(cfg.AuthProvider.WellKnownURL).OpenID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching metadata from auth provider: %w", err)

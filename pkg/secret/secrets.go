@@ -12,21 +12,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/tokendings"
 )
 
-const OldJwksKey = "jwks"
-const OldJwkKey = "jwk"
-const TokenXPrivateJwkKey = "TOKEN_X_PRIVATE_JWK"
-const TokenXWellKnownUrlKey = "TOKEN_X_WELL_KNOWN_URL"
-const TokenXClientIdKey = "TOKEN_X_CLIENT_ID"
-const TokenXSecretLabelKey = "type"
-const TokenXSecretLabelType = "jwker.nais.io"
+const (
+	OldJwksKey = "jwks"
+	OldJwkKey  = "jwk"
+
+	TokenXClientIdKey      = "TOKEN_X_CLIENT_ID"
+	TokenXIssuerKey        = "TOKEN_X_ISSUER"
+	TokenXJwksUriKey       = "TOKEN_X_JWKS_URI"
+	TokenXPrivateJwkKey    = "TOKEN_X_PRIVATE_JWK"
+	TokenXTokenEndpointKey = "TOKEN_X_TOKEN_ENDPOINT"
+	TokenXWellKnownUrlKey  = "TOKEN_X_WELL_KNOWN_URL"
+
+	TokenXSecretLabelKey  = "type"
+	TokenXSecretLabelType = "jwker.nais.io"
+)
 
 type PodSecretData struct {
-	ClientId               tokendings.ClientId
-	Jwk                    jose.JSONWebKey
-	TokenDingsWellKnownUrl string
+	ClientId         tokendings.ClientId
+	Jwk              jose.JSONWebKey
+	TokendingsConfig config.Tokendings
 }
 
 func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
@@ -150,8 +158,11 @@ func stringData(data PodSecretData) (map[string]string, error) {
 		return nil, fmt.Errorf("failed to marshal private JWK: %w", err)
 	}
 	return map[string]string{
-		TokenXPrivateJwkKey:   string(jwkJson),
-		TokenXClientIdKey:     data.ClientId.String(),
-		TokenXWellKnownUrlKey: data.TokenDingsWellKnownUrl,
+		TokenXPrivateJwkKey:    string(jwkJson),
+		TokenXClientIdKey:      data.ClientId.String(),
+		TokenXWellKnownUrlKey:  data.TokendingsConfig.WellKnownURL,
+		TokenXIssuerKey:        data.TokendingsConfig.Metadata.Issuer,
+		TokenXJwksUriKey:       data.TokendingsConfig.Metadata.JwksURI,
+		TokenXTokenEndpointKey: data.TokendingsConfig.Metadata.TokenEndpoint,
 	}, nil
 }

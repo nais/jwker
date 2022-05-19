@@ -3,14 +3,18 @@ package secret
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
+	"os"
+	"testing"
+
+	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"testing"
+
+	"github.com/nais/jwker/pkg/config"
+	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/nais/jwker/utils"
 )
 
 func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
@@ -51,19 +55,31 @@ func TestCreateSecretSpec(t *testing.T) {
 	assert.NoError(t, err)
 
 	secretData := PodSecretData{
-		ClientId:               app,
-		Jwk:                    jwk,
-		TokenDingsWellKnownUrl: "http://test/wellknown",
+		ClientId: app,
+		Jwk:      jwk,
+		TokendingsConfig: config.Tokendings{
+			Metadata: &oauth.MetadataOAuth{
+				MetadataCommon: oauth.MetadataCommon{
+					Issuer:        "https://tokendings.example.com",
+					JwksURI:       "https://tokendings.example.com/jwks",
+					TokenEndpoint: "https://tokendings.example.com/token",
+				},
+			},
+			WellKnownURL: "https://tokendings.example.com/.well-known/oauth-authorization-server",
+		},
 	}
 	actual, err := CreateSecretSpec(secretName, secretData)
 	assert.NoError(t, err)
 
-	t.Run("should contain JWK", func(t *testing.T) {
+	t.Run("should contain runtime variables", func(t *testing.T) {
 		expected, err := json.Marshal(jwk)
 		assert.NoError(t, err)
-		assert.Equal(t, string(expected), actual.StringData[TokenXPrivateJwkKey])
-		assert.Equal(t, "http://test/wellknown", actual.StringData[TokenXWellKnownUrlKey])
 		assert.Equal(t, app.String(), actual.StringData[TokenXClientIdKey])
+		assert.Equal(t, string(expected), actual.StringData[TokenXPrivateJwkKey])
+		assert.Equal(t, "https://tokendings.example.com/.well-known/oauth-authorization-server", actual.StringData[TokenXWellKnownUrlKey])
+		assert.Equal(t, "https://tokendings.example.com", actual.StringData[TokenXIssuerKey])
+		assert.Equal(t, "https://tokendings.example.com/jwks", actual.StringData[TokenXJwksUriKey])
+		assert.Equal(t, "https://tokendings.example.com/token", actual.StringData[TokenXTokenEndpointKey])
 	})
 }
 
