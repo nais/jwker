@@ -4,32 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
+	"github.com/nais/liberator/pkg/events"
+	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // for side effects only
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/nais/jwker/controllers"
+	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/jwker/utils"
 	// +kubebuilder:scaffold:imports
 )
 
-var cfg *rest.Config
 var cli client.Client
 var testEnv *envtest.Environment
 var ctx context.Context
@@ -41,9 +43,9 @@ const alreadyInUseSecret = "already-in-use"
 const expiredSecret = "expired-secret"
 const namespace = "default"
 
-type handler struct{}
+type tokendingsHandler struct{}
 
-func (h *handler) serveRegistration(w http.ResponseWriter, r *http.Request) {
+func (h *tokendingsHandler) serveRegistration(w http.ResponseWriter, r *http.Request) {
 	statement := &tokendings.ClientRegistration{}
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(statement)
@@ -54,11 +56,11 @@ func (h *handler) serveRegistration(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (h *handler) serveDelete(w http.ResponseWriter, r *http.Request) {
+func (h *tokendingsHandler) serveDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *tokendingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		h.serveRegistration(w, r)
 	} else if r.Method == http.MethodDelete {
@@ -186,28 +188,24 @@ func fixtures(cli client.Client) error {
 }
 
 func TestReconciler(t *testing.T) {
+	ctrl.SetLogger(zap.New())
+
 	crdPath := crd.YamlDirectory()
 
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{crdPath},
 	}
 
-	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	k8scfg, err := testEnv.Start()
 	assert.NoError(t, err)
-	assert.NotNil(t, listener)
-	h := &handler{}
-	go http.Serve(listener, h)
-
-	cfg, err = testEnv.Start()
-	assert.NoError(t, err)
-	assert.NotNil(t, cfg)
+	assert.NotNil(t, k8scfg)
 
 	err = nais_io_v1.AddToScheme(scheme.Scheme)
 	assert.NoError(t, err)
 
 	// +kubebuilder:scaffold:scheme
 
-	cli, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	cli, err = client.New(k8scfg, client.Options{Scheme: scheme.Scheme})
 	assert.NoError(t, err)
 	assert.NotNil(t, cli)
 
@@ -217,18 +215,17 @@ func TestReconciler(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	signkey, err := utils.GenerateJWK()
+	tokendingsServer := httptest.NewServer(&tokendingsHandler{})
+	cfg, err := makeConfig(tokendingsServer.URL)
 	assert.NoError(t, err)
 
 	jwker := &controllers.JwkerReconciler{
-		AzureCredentials: signkey,
-		Client:           cli,
-		ClusterName:      "local",
-		Log:              ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Recorder:         mgr.GetEventRecorderFor("jwker"),
-		Scheme:           mgr.GetScheme(),
-		TokenDingsUrl:    "http://" + listener.Addr().String(),
-		TokendingsToken:  &tokendings.TokenResponse{},
+		Client:          cli,
+		Log:             ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Recorder:        mgr.GetEventRecorderFor("jwker"),
+		Scheme:          mgr.GetScheme(),
+		TokendingsToken: &tokendings.TokenResponse{},
+		Config:          cfg,
 	}
 
 	err = jwker.SetupWithManager(mgr)
@@ -289,7 +286,7 @@ func TestReconciler(t *testing.T) {
 	hash, err := jwk.Spec.Hash()
 	assert.NoError(t, err)
 	assert.Equal(t, hash, jwk.Status.SynchronizationHash)
-	assert.Equal(t, nais_io_v1.EventRolloutComplete, jwk.Status.SynchronizationState)
+	assert.Equal(t, events.RolloutComplete, jwk.Status.SynchronizationState)
 
 	// remove the jwker resource; usually done when naiserator syncs
 	err = cli.Delete(ctx, jwk)
@@ -361,4 +358,29 @@ func waitForDeletedSecret(ctx context.Context, cli client.Client, namespace, nam
 			}
 		}
 	}
+}
+
+func makeConfig(tokendingsURL string) (*config.Config, error) {
+	jwk, err := utils.GenerateJWK()
+	if err != nil {
+		return nil, err
+	}
+
+	return &config.Config{
+		AuthProvider: config.AuthProvider{
+			ClientJwk: &jwk,
+		},
+		ClusterName: "local",
+		Tokendings: config.Tokendings{
+			BaseURL: tokendingsURL,
+			Metadata: &oauth.MetadataOAuth{
+				MetadataCommon: oauth.MetadataCommon{
+					Issuer:        tokendingsURL,
+					JwksURI:       tokendingsURL + "/jwks",
+					TokenEndpoint: tokendingsURL + "/token",
+				},
+			},
+			WellKnownURL: tokendingsURL + "/.well-known/oauth/authorization-server",
+		},
+	}, nil
 }

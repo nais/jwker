@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nais/jwker/pkg/tokendings"
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/nais/jwker/pkg/tokendings"
 )
 
 const OldJwksKey = "jwks"
@@ -153,8 +154,4 @@ func stringData(data PodSecretData) (map[string]string, error) {
 		TokenXClientIdKey:     data.ClientId.String(),
 		TokenXWellKnownUrlKey: data.TokenDingsWellKnownUrl,
 	}, nil
-}
-
-func WellKnownUrl(baseUrl string) string {
-	return fmt.Sprintf("%s/.well-known/oauth-authorization-server", baseUrl)
 }

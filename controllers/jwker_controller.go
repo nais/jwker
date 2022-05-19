@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/events"
 	"github.com/nais/liberator/pkg/kubernetes"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
@@ -19,6 +20,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/nais/jwker/pkg/config"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
@@ -34,25 +36,20 @@ const (
 // JwkerReconciler reconciles a Jwker object
 type JwkerReconciler struct {
 	client.Client
-	Log                logr.Logger
-	Scheme             *runtime.Scheme
-	ClusterName        string
-	ClientID           string
-	Endpoint           string
-	Reader             client.Reader
-	Recorder           record.EventRecorder
-	TokendingsClientID string
-	TokenDingsUrl      string
-	logger             logr.Logger
-	TokendingsToken    *tokendings.TokenResponse
-	AzureCredentials   jose.JSONWebKey
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	Reader          client.Reader
+	Recorder        record.EventRecorder
+	logger          logr.Logger
+	TokendingsToken *tokendings.TokenResponse
+	Config          *config.Config
 }
 
 func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 	return tokendings.ClientId{
 		Name:      req.Name,
 		Namespace: req.Namespace,
-		Cluster:   r.ClusterName,
+		Cluster:   r.Config.ClusterName,
 	}
 }
 
@@ -62,7 +59,7 @@ func (r *JwkerReconciler) RefreshToken() {
 
 	scope := &url.URL{
 		Scheme: "api",
-		Host:   r.TokendingsClientID,
+		Host:   r.Config.Tokendings.ClientID,
 		Path:   "/.default",
 	}
 	sc := scope.String()
@@ -71,7 +68,11 @@ func (r *JwkerReconciler) RefreshToken() {
 	for range t.C {
 
 		// Fetching a token for communicating with tokendings
-		r.TokendingsToken, err = tokendings.GetToken(&r.AzureCredentials, r.ClientID, sc, r.Endpoint)
+		jwk := r.Config.AuthProvider.ClientJwk
+		clientID := r.Config.AuthProvider.ClientID
+		endpoint := r.Config.AuthProvider.Metadata.TokenEndpoint
+
+		r.TokendingsToken, err = tokendings.GetToken(jwk, clientID, sc, endpoint)
 		if err != nil {
 			r.Log.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
 			exp = refreshTokenRetryInterval
@@ -92,7 +93,7 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 	r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
 
 	r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from tokendings", req.Name, req.Namespace))
-	if err := tokendings.DeleteClient(ctx, r.TokendingsToken.AccessToken, r.TokenDingsUrl, aid); err != nil {
+	if err := tokendings.DeleteClient(ctx, r.TokendingsToken.AccessToken, r.Config.Tokendings.BaseURL, aid); err != nil {
 		return fmt.Errorf("deleting resource from Tokendings: %s", err)
 	}
 
@@ -171,7 +172,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	app := r.appClientID(tx.req)
 
 	cr, err := tokendings.MakeClientRegistration(
-		&r.AzureCredentials,
+		r.Config.AuthProvider.ClientJwk,
 		&tx.keyset.Public,
 		app,
 		tx.jwker,
@@ -185,7 +186,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	err = tokendings.RegisterClient(
 		*cr,
 		r.TokendingsToken.AccessToken,
-		r.TokenDingsUrl,
+		r.Config.Tokendings.BaseURL,
 	)
 
 	if err != nil {
@@ -198,10 +199,11 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	if err != nil {
 		return fmt.Errorf("unable to get first jwk from jwks: %s", err)
 	}
+
 	secretData := secret.PodSecretData{
 		ClientId:               app,
 		Jwk:                    *jwk,
-		TokenDingsWellKnownUrl: secret.WellKnownUrl(r.TokenDingsUrl),
+		TokenDingsWellKnownUrl: r.Config.Tokendings.WellKnownURL,
 	}
 
 	if err := secret.CreateSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
@@ -266,7 +268,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// Update Jwker resource with status event
 	defer func() {
 		jwker.Status.SynchronizationTime = time.Now().UnixNano()
-		if jwker.Status.SynchronizationState == jwkerv1.EventFailedSynchronization || jwker.Status.SynchronizationState == jwkerv1.EventFailedPrepare {
+		if jwker.Status.SynchronizationState == events.FailedSynchronization || jwker.Status.SynchronizationState == events.FailedPrepare {
 			return
 		}
 
@@ -282,7 +284,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// prepare and commit
 	tx, err := r.prepare(ctx, req, jwker)
 	if err != nil {
-		jwker.Status.SynchronizationState = jwkerv1.EventFailedPrepare
+		jwker.Status.SynchronizationState = events.FailedPrepare
 		r.reportError(err, "failed prepare jwks")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
@@ -292,14 +294,14 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	tx.jwker = jwker
 	err = r.create(*tx)
 	if err != nil {
-		jwker.Status.SynchronizationState = jwkerv1.EventFailedSynchronization
+		jwker.Status.SynchronizationState = events.FailedSynchronization
 		r.reportError(err, "failed synchronization")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
 	}
 
-	jwker.Status.SynchronizationState = jwkerv1.EventRolloutComplete
+	jwker.Status.SynchronizationState = events.RolloutComplete
 	jwker.Status.SynchronizationHash = hash
 	jwker.Status.SynchronizationSecretName = tx.jwker.Spec.SecretName
 
