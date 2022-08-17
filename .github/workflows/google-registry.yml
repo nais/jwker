@@ -36,7 +36,7 @@ jobs:
         id: metadata
         uses: docker/metadata-action@v3
         with:
-          images: ${{ env.REGISTRY }}/up
+          images: ${{ env.REGISTRY }}/jwker
           # Docker tags based on the following events/attributes
           tags: |
             type=schedule
