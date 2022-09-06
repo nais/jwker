@@ -2,18 +2,25 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/go-logr/zapr"
+	"github.com/nais/jwker/pkg/secret"
+	"github.com/nais/jwker/utils"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
+	"gopkg.in/square/go-jose.v2"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
@@ -102,6 +109,60 @@ func main() {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
+	}
+}
+
+type RequiredSecrets struct {
+	PrivateJWKSecretName string
+	PublicJWKSSecretName string
+}
+
+func yolo() {
+	_ := map[string]string{
+		"app":        "jwker",
+		"share-with": "tokendings",
+	}
+}
+func EnsurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
+	privateJWKSecret, err := getSecret(ctx, c, namespace, secretName)
+	if err != nil {
+		return nil, err
+	}
+	if privateJWKSecret != nil {
+		return privateJWKSecret, nil
+	}
+	jwk, err := utils.GenerateJWK()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate JWK: %w", err)
+	}
+
+	jwkJson, err := json.Marshal(jwk)
+	if err != nil {
+		return nil, err
+	}
+	data := map[string]string{
+		"privateJWK": string(jwkJson),
+	}
+
+	s, err := secret.CreateSecret(c, ctx, secretName, namespace, nil, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create secret: %w", err)
+	}
+	return s, nil
+}
+
+func CreateSharedJWKSSecret(jwk jose.JSONWebKey) error {
+	return nil
+}
+
+func getSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
+	var existingSecret corev1.Secret
+	if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &existingSecret); errors.IsNotFound(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	} else {
+		return &existingSecret, nil
 	}
 }
 

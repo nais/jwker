@@ -219,7 +219,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		TokendingsConfig: r.Config.Tokendings,
 	}
 
-	if err := secret.CreateSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
+	if err := secret.CreateAppSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
 		return fmt.Errorf("reconciling secrets: %s", err)
 	}
 
