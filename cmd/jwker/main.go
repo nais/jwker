@@ -31,6 +31,11 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
+const (
+	JWKKeyName        = "privateJWK"
+	PrivateSecretName = "jwker-private-jwk"
+)
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -84,6 +89,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	jwk, err := ensurePrivateJWKSecret(ctx, mgr.GetClient(), cfg.Namespace, PrivateSecretName)
+	if err != nil {
+		setupLog.Error(err, "unable to read or create private jwk secret")
+		os.Exit(1)
+	}
+
+	cfg.AuthProvider.ClientJwk = jwk
+
+	if err := ensurePublicSecret(ctx, mgr.GetClient(), cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
+		setupLog.Error(err, "unable to create public jwk secret")
+		os.Exit(1)
+	}
+
 	reconciler := &controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
@@ -112,25 +130,37 @@ func main() {
 	}
 }
 
-type RequiredSecrets struct {
-	PrivateJWKSecretName string
-	PublicJWKSSecretName string
+func ensurePublicSecret(ctx context.Context, c client.Client, namespace string, name string, jwk *jose.JSONWebKey) error {
+	keySet := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk.Public()}}
+	b, err := json.Marshal(&keySet)
+	if err != nil {
+		return err
+	}
+	_, err = secret.CreateSecret(ctx, c, name, namespace, nil, map[string]string{"AUTH_CLIENT_JWKS": string(b)})
+	return err
 }
 
-func yolo() {
-	_ := map[string]string{
-		"app":        "jwker",
-		"share-with": "tokendings",
+func parseJWK(json []byte) (*jose.JSONWebKey, error) {
+	jwk := &jose.JSONWebKey{}
+	if err := jwk.UnmarshalJSON(json); err != nil {
+		return nil, err
 	}
+
+	return jwk, nil
 }
-func EnsurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
+func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*jose.JSONWebKey, error) {
 	privateJWKSecret, err := getSecret(ctx, c, namespace, secretName)
 	if err != nil {
 		return nil, err
 	}
 	if privateJWKSecret != nil {
-		return privateJWKSecret, nil
+		jwkJSON := privateJWKSecret.StringData[JWKKeyName]
+		if len(jwkJSON) == 0 {
+			return nil, fmt.Errorf("no jwk key in secret: %s", secretName)
+		}
+		return parseJWK([]byte(jwkJSON))
 	}
+
 	jwk, err := utils.GenerateJWK()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate JWK: %w", err)
@@ -144,15 +174,12 @@ func EnsurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, sec
 		"privateJWK": string(jwkJson),
 	}
 
-	s, err := secret.CreateSecret(c, ctx, secretName, namespace, nil, data)
+	_, err = secret.CreateSecret(ctx, c, secretName, namespace, nil, data)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret: %w", err)
 	}
-	return s, nil
-}
-
-func CreateSharedJWKSSecret(jwk jose.JSONWebKey) error {
-	return nil
+	return &jwk, nil
 }
 
 func getSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {

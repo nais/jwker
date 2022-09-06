@@ -87,8 +87,8 @@ func extractOldJwk(sec corev1.Secret) (*jose.JSONWebKey, error) {
 }
 
 func CreateSecret(
-	client client.Client,
 	ctx context.Context,
+	client client.Client,
 	secretName string,
 	namespace string,
 	labels, data map[string]string,
@@ -113,7 +113,7 @@ func CreateSecret(
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to apply secretSpec: %s", err)
+		return nil, fmt.Errorf("unable to apply secretSpec: %s", err)
 	}
 
 	return &s, nil

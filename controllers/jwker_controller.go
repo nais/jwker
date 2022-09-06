@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"sync"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
 	"github.com/nais/liberator/pkg/kubernetes"
-	log "github.com/sirupsen/logrus"
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,41 +58,15 @@ func (r *JwkerReconciler) RefreshToken() {
 
 	var err error
 
-	if r.Config.Tokendings.SelfsignedToken {
-		jwt, err := tokendings.ClientAssertion(jwk, clientID, endpoint)
-		if err != nil {
-			r.Log.Error(err, "failed to generate client assertion")
-		}
-		r.TokendingsToken = &tokendings.TokenResponse{
-			AccessToken: jwt,
-			TokenType:   "Bearer",
-			ExpiresIn:   0,
-			Scope:       "",
-		}
-
-	} else {
-		exp := 0 * time.Second
-
-		scope := &url.URL{
-			Scheme: "api",
-			Host:   r.Config.Tokendings.ClientID,
-			Path:   "/.default",
-		}
-		sc := scope.String()
-
-		t := time.NewTimer(exp)
-		for range t.C {
-			r.TokendingsToken, err = tokendings.GetToken(jwk, clientID, sc, endpoint)
-			if err != nil {
-				r.Log.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
-				exp = refreshTokenRetryInterval
-			} else {
-				secs := float64(r.TokendingsToken.ExpiresIn) / 3
-				exp = time.Duration(int(secs)) * time.Second
-				log.Infof("got token from Azure, next refresh in %s", exp)
-			}
-			t.Reset(exp)
-		}
+	jwt, err := tokendings.ClientAssertion(jwk, clientID, endpoint)
+	if err != nil {
+		r.Log.Error(err, "failed to generate client assertion")
+	}
+	r.TokendingsToken = &tokendings.TokenResponse{
+		AccessToken: jwt,
+		TokenType:   "Bearer",
+		ExpiresIn:   0,
+		Scope:       "",
 	}
 }
 
