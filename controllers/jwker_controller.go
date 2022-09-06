@@ -54,34 +54,47 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 }
 
 func (r *JwkerReconciler) RefreshToken() {
+	jwk := r.Config.AuthProvider.ClientJwk
+	clientID := r.Config.AuthProvider.ClientID
+	endpoint := r.Config.AuthProvider.Metadata.TokenEndpoint
+
 	var err error
-	exp := 0 * time.Second
 
-	scope := &url.URL{
-		Scheme: "api",
-		Host:   r.Config.Tokendings.ClientID,
-		Path:   "/.default",
-	}
-	sc := scope.String()
-
-	t := time.NewTimer(exp)
-	for range t.C {
-
-		// Fetching a token for communicating with tokendings
-		jwk := r.Config.AuthProvider.ClientJwk
-		clientID := r.Config.AuthProvider.ClientID
-		endpoint := r.Config.AuthProvider.Metadata.TokenEndpoint
-
-		r.TokendingsToken, err = tokendings.GetToken(jwk, clientID, sc, endpoint)
+	if r.Config.Tokendings.SelfsignedToken {
+		jwt, err := tokendings.ClientAssertion(jwk, clientID, endpoint)
 		if err != nil {
-			r.Log.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
-			exp = refreshTokenRetryInterval
-		} else {
-			secs := float64(r.TokendingsToken.ExpiresIn) / 3
-			exp = time.Duration(int(secs)) * time.Second
-			log.Infof("got token from Azure, next refresh in %s", exp)
+			r.Log.Error(err, "failed to generate client assertion")
 		}
-		t.Reset(exp)
+		r.TokendingsToken = &tokendings.TokenResponse{
+			AccessToken: jwt,
+			TokenType:   "Bearer",
+			ExpiresIn:   0,
+			Scope:       "",
+		}
+
+	} else {
+		exp := 0 * time.Second
+
+		scope := &url.URL{
+			Scheme: "api",
+			Host:   r.Config.Tokendings.ClientID,
+			Path:   "/.default",
+		}
+		sc := scope.String()
+
+		t := time.NewTimer(exp)
+		for range t.C {
+			r.TokendingsToken, err = tokendings.GetToken(jwk, clientID, sc, endpoint)
+			if err != nil {
+				r.Log.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
+				exp = refreshTokenRetryInterval
+			} else {
+				secs := float64(r.TokendingsToken.ExpiresIn) / 3
+				exp = time.Duration(int(secs)) * time.Second
+				log.Infof("got token from Azure, next refresh in %s", exp)
+			}
+			t.Reset(exp)
+		}
 	}
 }
 

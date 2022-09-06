@@ -21,10 +21,11 @@ type Config struct {
 }
 
 type Tokendings struct {
-	BaseURL      string
-	ClientID     string
-	Metadata     *oauth.MetadataOAuth
-	WellKnownURL string
+	BaseURL         string
+	ClientID        string
+	Metadata        *oauth.MetadataOAuth
+	WellKnownURL    string
+	SelfsignedToken bool
 }
 
 type AuthProvider struct {
@@ -45,6 +46,7 @@ func New(ctx context.Context) (*Config, error) {
 	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.StringVar(&cfg.Tokendings.BaseURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "Base URL to Tokendings.")
 	flag.StringVar(&cfg.Tokendings.ClientID, "tokendings-client-id", os.Getenv("TOKENDINGS_CLIENT_ID"), "Client ID of Tokendings at Auth Provider")
+	flag.BoolVar(&cfg.Tokendings.SelfsignedToken, "tokendings-selfsigned-token", os.Getenv("TOKENDINGS_SELFSIGNED_TOKEN") != "", "Should we use a self-signed token to talk to tokendings?")
 	flag.Parse()
 
 	tokendingsWellKnownURL, err := url.Parse(cfg.Tokendings.BaseURL)
