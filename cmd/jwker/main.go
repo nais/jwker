@@ -90,19 +90,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	jwk, err := ensurePrivateJWKSecret(ctx, mgr.GetClient(), cfg.Namespace, PrivateSecretName)
-	if err != nil {
-		setupLog.Error(err, "unable to read or create private jwk secret")
-		os.Exit(1)
-	}
-
-	cfg.AuthProvider.ClientJwk = jwk
-
-	if err := ensurePublicSecret(ctx, mgr.GetClient(), cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
-		setupLog.Error(err, "unable to create public jwk secret")
-		os.Exit(1)
-	}
-
 	reconciler := &controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
@@ -114,6 +101,19 @@ func main() {
 
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
+		os.Exit(1)
+	}
+
+	jwk, err := ensurePrivateJWKSecret(ctx, mgr.GetClient(), cfg.Namespace, PrivateSecretName)
+	if err != nil {
+		setupLog.Error(err, "unable to read or create private jwk secret")
+		os.Exit(1)
+	}
+
+	cfg.AuthProvider.ClientJwk = jwk
+
+	if err := ensurePublicSecret(ctx, mgr.GetClient(), cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
+		setupLog.Error(err, "unable to create public jwk secret")
 		os.Exit(1)
 	}
 
