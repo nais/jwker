@@ -47,10 +47,11 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.StringVar(&cfg.Tokendings.BaseURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "Base URL to Tokendings.")
 	flag.StringVar(&cfg.Tokendings.ClientID, "tokendings-client-id", os.Getenv("TOKENDINGS_CLIENT_ID"), "Client ID of Tokendings at Auth Provider")
-	flag.StringVar(&cfg.Tokendings.Metadata.Issuer, "tokendings-metadata-issuer", os.Getenv("TOKENDINGS_METADATA_ISSUER"), "Tokendings metadata issuer")
-	flag.StringVar(&cfg.Tokendings.Metadata.JwksURI, "tokendings-metadata-JwksURI", os.Getenv("TOKENDINGS_METADATA_JWKSURI"), "Tokendings metadata JWKS URI")
-	flag.StringVar(&cfg.Tokendings.Metadata.TokenEndpoint, "tokendings-metadata-tokenendpoint", os.Getenv("TOKENDINGS_METADATA_TOKENENDPOINT"), "Tokendings metadata token endpoint")
 	flag.Parse()
+
+	cfg.Tokendings.Metadata.Issuer = cfg.Tokendings.BaseURL
+	cfg.Tokendings.Metadata.JwksURI = fmt.Sprintf("%s/jwks", cfg.Tokendings.BaseURL)
+	cfg.Tokendings.Metadata.TokenEndpoint = fmt.Sprintf("%s/token", cfg.Tokendings.BaseURL)
 
 	tokendingsWellKnownURL, err := url.Parse(cfg.Tokendings.BaseURL)
 	if err != nil {
