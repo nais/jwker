@@ -74,7 +74,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-	cfg, err := config.New(ctx)
+	cfg, err := config.New()
 	if err != nil {
 		setupLog.Error(err, "initializing config")
 		os.Exit(1)
@@ -95,7 +95,6 @@ func main() {
 		setupLog.Error(err, "unable to read or create private jwk secret")
 		os.Exit(1)
 	}
-	setupLog.Info("ensured private jwk secret")
 
 	cfg.AuthProvider.ClientJwk = jwk
 
@@ -103,7 +102,6 @@ func main() {
 		setupLog.Error(err, "unable to create public jwk secret")
 		os.Exit(1)
 	}
-	setupLog.Info("ensured public jwk secret")
 
 	reconciler := &controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
@@ -152,7 +150,6 @@ func parseJWK(json []byte) (*jose.JSONWebKey, error) {
 	return jwk, nil
 }
 func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*jose.JSONWebKey, error) {
-	log.Info("ensuring private jwk secret")
 	privateJWKSecret, err := getSecret(ctx, c, namespace, secretName)
 	if err != nil {
 		return nil, err
