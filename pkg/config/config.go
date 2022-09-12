@@ -37,6 +37,7 @@ type AuthProvider struct {
 
 func New() (*Config, error) {
 	cfg := &Config{}
+	cfg.Tokendings.Metadata = &oauth.MetadataOAuth{}
 
 	flag.StringVar(&cfg.AuthProvider.ClientJwkFile, "client-jwk-file", "/var/run/secrets/azure/jwk.json", "file with JWK credential for client at Auth Provider.")
 	flag.StringVar(&cfg.AuthProvider.ClientID, "client-id", os.Getenv("JWKER_CLIENT_ID"), "Client ID of Jwker at Auth Provider.")
