@@ -65,6 +65,7 @@ func init() {
 
 func main() {
 	zapLogger, err := setupZapLogger()
+	setupLog.Info("starting jwker")
 	if err != nil {
 		setupLog.Error(err, "unable to set up logger")
 		os.Exit(1)
@@ -94,6 +95,7 @@ func main() {
 		setupLog.Error(err, "unable to read or create private jwk secret")
 		os.Exit(1)
 	}
+	setupLog.Info("ensured private jwk secret")
 
 	cfg.AuthProvider.ClientJwk = jwk
 
@@ -101,6 +103,7 @@ func main() {
 		setupLog.Error(err, "unable to create public jwk secret")
 		os.Exit(1)
 	}
+	setupLog.Info("ensured public jwk secret")
 
 	reconciler := &controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
@@ -149,10 +152,12 @@ func parseJWK(json []byte) (*jose.JSONWebKey, error) {
 	return jwk, nil
 }
 func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*jose.JSONWebKey, error) {
+	log.Info("ensuring private jwk secret")
 	privateJWKSecret, err := getSecret(ctx, c, namespace, secretName)
 	if err != nil {
 		return nil, err
 	}
+
 	if privateJWKSecret != nil {
 		jwkJSON := privateJWKSecret.StringData[JWKKeyName]
 		if len(jwkJSON) == 0 {
@@ -185,10 +190,13 @@ func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, sec
 func getSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
 	var existingSecret corev1.Secret
 	if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &existingSecret); errors.IsNotFound(err) {
+		log.Info("secret not found", "secret", secretName)
 		return nil, nil
 	} else if err != nil {
+		log.Info("error getting secret", "secret", secretName, "error", err)
 		return nil, err
 	} else {
+		log.Info("found secret", "secret", secretName)
 		return &existingSecret, nil
 	}
 }
