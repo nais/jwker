@@ -105,6 +105,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	mgr.GetCache().WaitForCacheSync(ctx)
+
 	jwk, err := ensurePrivateJWKSecret(ctx, client, cfg.Namespace, PrivateSecretName)
 	if err != nil {
 		setupLog.Error(err, "unable to read or create private jwk secret")
