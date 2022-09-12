@@ -89,9 +89,10 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	client := mgr.GetClient()
 
 	reconciler := &controllers.JwkerReconciler{
-		Client:   mgr.GetClient(),
+		Client:   client,
 		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
 		Reader:   mgr.GetAPIReader(),
 		Recorder: mgr.GetEventRecorderFor("Jwker"),
@@ -104,7 +105,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	jwk, err := ensurePrivateJWKSecret(ctx, mgr.GetClient(), cfg.Namespace, PrivateSecretName)
+	jwk, err := ensurePrivateJWKSecret(ctx, client, cfg.Namespace, PrivateSecretName)
 	if err != nil {
 		setupLog.Error(err, "unable to read or create private jwk secret")
 		os.Exit(1)
@@ -112,7 +113,7 @@ func main() {
 
 	cfg.AuthProvider.ClientJwk = jwk
 
-	if err := ensurePublicSecret(ctx, mgr.GetClient(), cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
+	if err := ensurePublicSecret(ctx, client, cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
 		setupLog.Error(err, "unable to create public jwk secret")
 		os.Exit(1)
 	}
