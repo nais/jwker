@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -75,7 +76,7 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
+	ctx := context.Background()
 	reconciler := &controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
@@ -87,6 +88,11 @@ func main() {
 
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
+		os.Exit(1)
+	}
+
+	if err := reconciler.SetupJwkerJwk(ctx); err != nil {
+		setupLog.Error(err, "unable to setup secrets for jwker", "controller", "Jwker")
 		os.Exit(1)
 	}
 

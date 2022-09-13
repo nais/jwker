@@ -215,10 +215,6 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	jwkermetrics.JwkersProcessedCount.Inc()
 
-	if err := r.setupJwkerJwk(ctx); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	/*if r.TokendingsToken == nil {
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
@@ -342,7 +338,7 @@ func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *JwkerReconciler) setupJwkerJwk(ctx context.Context) error {
+func (r *JwkerReconciler) SetupJwkerJwk(ctx context.Context) error {
 
 	cfg := r.Config
 	jwk, err := ensurePrivateJWKSecret(ctx, r.Client, cfg.Namespace, PrivateSecretName)
@@ -422,13 +418,13 @@ func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, sec
 func getSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
 	var existingSecret corev1.Secret
 	if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &existingSecret); errors.IsNotFound(err) {
-		log.Info("secret not found:", secretName)
+		log.Debug("secret not found:", secretName)
 		return nil, nil
 	} else if err != nil {
-		log.Info("error getting secret:", secretName, " error:", err)
+		log.Debug("error getting secret:", secretName, " error:", err)
 		return nil, err
 	} else {
-		log.Info("found secret:", secretName)
+		log.Debug("found secret:", secretName)
 		return &existingSecret, nil
 	}
 }
