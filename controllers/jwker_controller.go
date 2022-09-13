@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -11,10 +10,8 @@ import (
 	"github.com/google/uuid"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
-	"github.com/nais/liberator/pkg/kubernetes"
-	log "github.com/sirupsen/logrus"
+	libernetes "github.com/nais/liberator/pkg/kubernetes"
 	"gopkg.in/square/go-jose.v2"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -32,10 +29,6 @@ import (
 const (
 	refreshTokenRetryInterval = 10 * time.Second
 	requeueInterval           = 10 * time.Second
-)
-const (
-	JWKKeyName        = "privateJWK"
-	PrivateSecretName = "jwker-private-jwk"
 )
 
 // JwkerReconciler reconciles a Jwker object
@@ -58,7 +51,7 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 	}
 }
 
-func (r *JwkerReconciler) RefreshToken() {
+func (r *JwkerReconciler) CreateToken() {
 	jwk := r.Config.AuthProvider.ClientJwk
 	clientID := r.Config.AuthProvider.ClientID
 	endpoint := fmt.Sprintf("%s/registration/client", r.Config.Tokendings.BaseURL)
@@ -102,7 +95,7 @@ type transaction struct {
 	ctx         context.Context
 	req         ctrl.Request
 	keyset      utils.KeySet
-	secretLists kubernetes.SecretLists
+	secretLists libernetes.SecretLists
 	jwker       jwkerv1.Jwker
 }
 
@@ -122,7 +115,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 	}
 
 	// find intersect between secrets in use by deployment and all jwker managed secrets
-	secrets := kubernetes.ListUsedAndUnusedSecretsForPods(allSecrets, *podList)
+	secrets := libernetes.ListUsedAndUnusedSecretsForPods(allSecrets, *podList)
 
 	existingJwks := jose.JSONWebKeySet{}
 
@@ -215,12 +208,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	jwkermetrics.JwkersProcessedCount.Inc()
 
-	/*if r.TokendingsToken == nil {
-		return ctrl.Result{
-			RequeueAfter: requeueInterval,
-		}, nil
-	}*/
-	r.RefreshToken()
+	r.CreateToken()
 
 	r.logger = r.Log.WithValues(
 		"jwker", req.NamespacedName,
@@ -336,95 +324,4 @@ func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&jwkerv1.Jwker{}).
 		Complete(r)
-}
-
-func (r *JwkerReconciler) SetupJwkerJwk(ctx context.Context) error {
-
-	cfg := r.Config
-	jwk, err := ensurePrivateJWKSecret(ctx, r.Client, cfg.Namespace, PrivateSecretName)
-	if err != nil {
-		r.logger.Error(err, "unable to read or create private jwk secret")
-		return err
-	}
-
-	r.Config.AuthProvider.ClientJwk = jwk
-
-	if err := ensurePublicSecret(ctx, r.Client, cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
-		r.logger.Error(err, "unable to create public jwk secret")
-		return err
-	}
-	return nil
-}
-
-func ensurePublicSecret(ctx context.Context, c client.Client, namespace string, name string, jwk *jose.JSONWebKey) error {
-	existing, err := getSecret(ctx, c, namespace, name)
-	if existing != nil {
-		//secret already exists
-		return nil
-	}
-	keySet := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk.Public()}}
-	b, err := json.Marshal(&keySet)
-	if err != nil {
-		return err
-	}
-	_, err = secret.CreateSecret(ctx, c, name, namespace, nil, map[string]string{"AUTH_CLIENT_JWKS": string(b)})
-	return err
-}
-
-func parseJWK(json []byte) (*jose.JSONWebKey, error) {
-	jwk := &jose.JSONWebKey{}
-	if err := jwk.UnmarshalJSON(json); err != nil {
-		return nil, err
-	}
-
-	return jwk, nil
-}
-
-func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*jose.JSONWebKey, error) {
-	privateJWKSecret, err := getSecret(ctx, c, namespace, secretName)
-	if err != nil {
-		return nil, err
-	}
-
-	if privateJWKSecret != nil {
-		jwkJSON := privateJWKSecret.Data[JWKKeyName]
-		if len(jwkJSON) == 0 {
-			return nil, fmt.Errorf("no %s key in secret: %s", JWKKeyName, secretName)
-		}
-		return parseJWK([]byte(jwkJSON))
-	}
-
-	jwk, err := utils.GenerateJWK()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate JWK: %w", err)
-	}
-
-	jwkJson, err := json.Marshal(jwk)
-	if err != nil {
-		return nil, err
-	}
-	data := map[string]string{
-		"privateJWK": string(jwkJson),
-	}
-
-	_, err = secret.CreateSecret(ctx, c, secretName, namespace, nil, data)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create secret: %w", err)
-	}
-	return &jwk, nil
-}
-
-func getSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
-	var existingSecret corev1.Secret
-	if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &existingSecret); errors.IsNotFound(err) {
-		log.Debug("secret not found:", secretName)
-		return nil, nil
-	} else if err != nil {
-		log.Debug("error getting secret:", secretName, " error:", err)
-		return nil, err
-	} else {
-		log.Debug("found secret:", secretName)
-		return &existingSecret, nil
-	}
 }
