@@ -215,6 +215,10 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	jwkermetrics.JwkersProcessedCount.Inc()
 
+	if err := r.setupJwkerJwk(ctx); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	/*if r.TokendingsToken == nil {
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
@@ -333,12 +337,15 @@ func (r *JwkerReconciler) reportError(err error, message string) {
 }
 
 func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	cfg := r.Config
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-	client := mgr.GetClient()
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&jwkerv1.Jwker{}).
+		Complete(r)
+}
 
-	jwk, err := ensurePrivateJWKSecret(ctx, client, cfg.Namespace, PrivateSecretName)
+func (r *JwkerReconciler) setupJwkerJwk(ctx context.Context) error {
+
+	cfg := r.Config
+	jwk, err := ensurePrivateJWKSecret(ctx, r.Client, cfg.Namespace, PrivateSecretName)
 	if err != nil {
 		r.logger.Error(err, "unable to read or create private jwk secret")
 		return err
@@ -346,16 +353,19 @@ func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	r.Config.AuthProvider.ClientJwk = jwk
 
-	if err := ensurePublicSecret(ctx, client, cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
+	if err := ensurePublicSecret(ctx, r.Client, cfg.Namespace, cfg.SharedPublicSecretName, jwk); err != nil {
 		r.logger.Error(err, "unable to create public jwk secret")
 		return err
 	}
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&jwkerv1.Jwker{}).
-		Complete(r)
+	return nil
 }
 
 func ensurePublicSecret(ctx context.Context, c client.Client, namespace string, name string, jwk *jose.JSONWebKey) error {
+	existing, err := getSecret(ctx, c, namespace, name)
+	if existing != nil {
+		//secret already exists
+		return nil
+	}
 	keySet := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk.Public()}}
 	b, err := json.Marshal(&keySet)
 	if err != nil {
@@ -373,6 +383,7 @@ func parseJWK(json []byte) (*jose.JSONWebKey, error) {
 
 	return jwk, nil
 }
+
 func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, secretName string) (*jose.JSONWebKey, error) {
 	privateJWKSecret, err := getSecret(ctx, c, namespace, secretName)
 	if err != nil {
