@@ -106,7 +106,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr.GetCache().WaitForCacheSync(ctx)
+	//mgr.GetCache().WaitForCacheSync(ctx)
 
 	jwk, err := ensurePrivateJWKSecret(ctx, client, cfg.Namespace, PrivateSecretName)
 	if err != nil {
