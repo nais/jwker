@@ -90,6 +90,12 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	sync := mgr.GetCache().WaitForCacheSync(ctx)
+	if !sync {
+		setupLog.Error(err, "failed to sync cache")
+		os.Exit(1)
+	}
+
 	client := mgr.GetClient()
 
 	reconciler := &controllers.JwkerReconciler{
@@ -105,8 +111,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
 	}
-
-	//mgr.GetCache().WaitForCacheSync(ctx)
 
 	jwk, err := ensurePrivateJWKSecret(ctx, client, cfg.Namespace, PrivateSecretName)
 	if err != nil {
