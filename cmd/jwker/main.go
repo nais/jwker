@@ -64,6 +64,7 @@ func init() {
 }
 
 func main() {
+	fmt.Println("starting")
 	zapLogger, err := setupZapLogger()
 	setupLog.Info("starting jwker")
 	if err != nil {
