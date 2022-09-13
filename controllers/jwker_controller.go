@@ -215,11 +215,12 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	jwkermetrics.JwkersProcessedCount.Inc()
 
-	if r.TokendingsToken == nil {
+	/*if r.TokendingsToken == nil {
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
-	}
+	}*/
+	r.RefreshToken()
 
 	r.logger = r.Log.WithValues(
 		"jwker", req.NamespacedName,
