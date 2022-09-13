@@ -61,7 +61,7 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 func (r *JwkerReconciler) RefreshToken() {
 	jwk := r.Config.AuthProvider.ClientJwk
 	clientID := r.Config.AuthProvider.ClientID
-	endpoint := r.Config.Tokendings.Metadata.TokenEndpoint
+	endpoint := fmt.Sprintf("%s/registration/client", r.Config.Tokendings.BaseURL)
 
 	var err error
 
