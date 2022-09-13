@@ -370,6 +370,7 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 		AuthProvider: config.AuthProvider{
 			ClientJwk: &jwk,
 		},
+		Namespace:   namespace,
 		ClusterName: "local",
 		Tokendings: config.Tokendings{
 			BaseURL: tokendingsURL,
@@ -382,5 +383,6 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 			},
 			WellKnownURL: tokendingsURL + "/.well-known/oauth/authorization-server",
 		},
+		SharedPublicSecretName: "shared-public-secret",
 	}, nil
 }

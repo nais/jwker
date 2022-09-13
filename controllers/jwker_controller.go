@@ -61,7 +61,7 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 func (r *JwkerReconciler) RefreshToken() {
 	jwk := r.Config.AuthProvider.ClientJwk
 	clientID := r.Config.AuthProvider.ClientID
-	endpoint := r.Config.AuthProvider.Metadata.TokenEndpoint
+	endpoint := r.Config.Tokendings.Metadata.TokenEndpoint
 
 	var err error
 
@@ -391,9 +391,9 @@ func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, sec
 	}
 
 	if privateJWKSecret != nil {
-		jwkJSON := privateJWKSecret.StringData[JWKKeyName]
+		jwkJSON := privateJWKSecret.Data[JWKKeyName]
 		if len(jwkJSON) == 0 {
-			return nil, fmt.Errorf("no jwk key in secret: %s", secretName)
+			return nil, fmt.Errorf("no %s key in secret: %s", JWKKeyName, secretName)
 		}
 		return parseJWK([]byte(jwkJSON))
 	}
@@ -422,13 +422,13 @@ func ensurePrivateJWKSecret(ctx context.Context, c client.Client, namespace, sec
 func getSecret(ctx context.Context, c client.Client, namespace, secretName string) (*corev1.Secret, error) {
 	var existingSecret corev1.Secret
 	if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &existingSecret); errors.IsNotFound(err) {
-		log.Info("secret not found", "secret", secretName)
+		log.Info("secret not found:", secretName)
 		return nil, nil
 	} else if err != nil {
-		log.Info("error getting secret", "secret", secretName, "error", err)
+		log.Info("error getting secret:", secretName, " error:", err)
 		return nil, err
 	} else {
-		log.Info("found secret", "secret", secretName)
+		log.Info("found secret:", secretName)
 		return &existingSecret, nil
 	}
 }
