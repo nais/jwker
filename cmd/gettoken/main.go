@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 	flag "github.com/spf13/pflag"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -132,7 +132,7 @@ func applicationToken(params newTokenParams) (*tokendings.TokenResponse, error) 
 		Expiry:    jwt.NewNumericDate(now.Add(time.Second * 500)),
 		NotBefore: jwt.NewNumericDate(now),
 		IssuedAt:  jwt.NewNumericDate(now),
-		ID:        utils.RandStringBytes(8),
+		ID:        jwkutils.RandStringBytes(8),
 	}
 	builder = builder.Claims(claims)
 	rawJWT, err := builder.CompactSerialize()

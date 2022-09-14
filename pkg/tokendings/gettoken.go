@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nais/jwker/utils"
+	"github.com/nais/jwker/jwkutils"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -45,7 +45,7 @@ func Claims(clientid, audience string) CustomClaims {
 		Subject:   clientid,
 		Expiry:    *exp,
 		NotBefore: 1,
-		ID:        utils.RandStringBytes(8),
+		ID:        jwkutils.RandStringBytes(8),
 		Audience:  audience,
 	}
 }
@@ -61,21 +61,7 @@ func OauthForm(scope, clientAssertion string) url.Values {
 
 // scope = api://tokendings.prod
 func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, endpoint string) (*TokenResponse, error) {
-	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
-
-	signerOpts := jose.SignerOptions{}
-	signerOpts.WithType("JWT")
-	signerOpts.WithHeader("kid", privateJwk.KeyID)
-
-	rsaSigner, err := jose.NewSigner(key, &signerOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	claims := Claims(clientID, endpoint)
-
-	builder := jwt.Signed(rsaSigner).Claims(claims)
-	rawJWT, err := builder.CompactSerialize()
+	rawJWT, err := ClientAssertion(privateJwk, clientID, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -105,4 +91,26 @@ func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, endpoint stri
 	}
 
 	return token, nil
+}
+
+func ClientAssertion(privateJwk *jose.JSONWebKey, clientID string, endpoint string) (string, error) {
+	key := jose.SigningKey{Algorithm: jose.RS256, Key: privateJwk.Key}
+
+	signerOpts := jose.SignerOptions{}
+	signerOpts.WithType("JWT")
+	signerOpts.WithHeader("kid", privateJwk.KeyID)
+
+	rsaSigner, err := jose.NewSigner(key, &signerOpts)
+	if err != nil {
+		return "", err
+	}
+
+	claims := Claims(clientID, endpoint)
+
+	builder := jwt.Signed(rsaSigner).Claims(claims)
+	rawJWT, err := builder.CompactSerialize()
+	if err != nil {
+		return "", err
+	}
+	return rawJWT, nil
 }

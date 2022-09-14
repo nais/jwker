@@ -3,16 +3,15 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"github.com/nais/jwker/jwkutils"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
-	"github.com/nais/liberator/pkg/kubernetes"
-	log "github.com/sirupsen/logrus"
+	libernetes "github.com/nais/liberator/pkg/kubernetes"
 	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +24,6 @@ import (
 	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 )
 
 const (
@@ -53,35 +51,22 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 	}
 }
 
-func (r *JwkerReconciler) RefreshToken() {
+func (r *JwkerReconciler) CreateToken() {
+	jwk := r.Config.AuthProvider.ClientJwk
+	clientID := r.Config.AuthProvider.ClientID
+	endpoint := fmt.Sprintf("%s/registration/client", r.Config.Tokendings.BaseURL)
+
 	var err error
-	exp := 0 * time.Second
 
-	scope := &url.URL{
-		Scheme: "api",
-		Host:   r.Config.Tokendings.ClientID,
-		Path:   "/.default",
+	jwt, err := tokendings.ClientAssertion(jwk, clientID, endpoint)
+	if err != nil {
+		r.Log.Error(err, "failed to generate client assertion")
 	}
-	sc := scope.String()
-
-	t := time.NewTimer(exp)
-	for range t.C {
-
-		// Fetching a token for communicating with tokendings
-		jwk := r.Config.AuthProvider.ClientJwk
-		clientID := r.Config.AuthProvider.ClientID
-		endpoint := r.Config.AuthProvider.Metadata.TokenEndpoint
-
-		r.TokendingsToken, err = tokendings.GetToken(jwk, clientID, sc, endpoint)
-		if err != nil {
-			r.Log.Error(err, "unable to fetch token from azure. will retry in 10 secs.")
-			exp = refreshTokenRetryInterval
-		} else {
-			secs := float64(r.TokendingsToken.ExpiresIn) / 3
-			exp = time.Duration(int(secs)) * time.Second
-			log.Infof("got token from Azure, next refresh in %s", exp)
-		}
-		t.Reset(exp)
+	r.TokendingsToken = &tokendings.TokenResponse{
+		AccessToken: jwt,
+		TokenType:   "Bearer",
+		ExpiresIn:   0,
+		Scope:       "",
 	}
 }
 
@@ -109,8 +94,8 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 type transaction struct {
 	ctx         context.Context
 	req         ctrl.Request
-	keyset      utils.KeySet
-	secretLists kubernetes.SecretLists
+	keyset      jwkutils.KeySet
+	secretLists libernetes.SecretLists
 	jwker       jwkerv1.Jwker
 }
 
@@ -130,7 +115,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 	}
 
 	// find intersect between secrets in use by deployment and all jwker managed secrets
-	secrets := kubernetes.ListUsedAndUnusedSecretsForPods(allSecrets, *podList)
+	secrets := libernetes.ListUsedAndUnusedSecretsForPods(allSecrets, *podList)
 
 	existingJwks := jose.JSONWebKeySet{}
 
@@ -151,13 +136,13 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 
 	if r.shouldUpdateSecrets(jwker) || newJwk.Key == nil {
 		r.logger.Info("Generating new JWK")
-		newJwk, err = utils.GenerateJWK()
+		newJwk, err = jwkutils.GenerateJWK()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	keyset := utils.KeySetWithExisting(newJwk, existingJwks.Keys)
+	keyset := jwkutils.KeySetWithExisting(newJwk, existingJwks.Keys)
 
 	return &transaction{
 		ctx:         ctx,
@@ -206,7 +191,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		TokendingsConfig: r.Config.Tokendings,
 	}
 
-	if err := secret.CreateSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
+	if err := secret.CreateAppSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
 		return fmt.Errorf("reconciling secrets: %s", err)
 	}
 
@@ -223,11 +208,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	jwkermetrics.JwkersProcessedCount.Inc()
 
-	if r.TokendingsToken == nil {
-		return ctrl.Result{
-			RequeueAfter: requeueInterval,
-		}, nil
-	}
+	r.CreateToken()
 
 	r.logger = r.Log.WithValues(
 		"jwker", req.NamespacedName,

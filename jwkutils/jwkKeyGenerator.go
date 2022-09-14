@@ -1,4 +1,4 @@
-package utils
+package jwkutils
 
 import (
 	cryptorand "crypto/rand"
@@ -23,6 +23,15 @@ func RandStringBytes(n int) string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
+}
+
+func ParseJWK(json []byte) (*jose.JSONWebKey, error) {
+	jwk := &jose.JSONWebKey{}
+	if err := jwk.UnmarshalJSON(json); err != nil {
+		return nil, err
+	}
+
+	return jwk, nil
 }
 
 func GenerateJWK() (jose.JSONWebKey, error) {

@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/jwker/jwkutils"
+	nais_io_v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
 	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // for side effects only
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,7 +29,6 @@ import (
 	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -132,7 +132,7 @@ func fixtures(cli client.Client) error {
 		return err
 	}
 
-	key, err := utils.GenerateJWK()
+	key, err := jwkutils.GenerateJWK()
 	if err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ func waitForDeletedSecret(ctx context.Context, cli client.Client, namespace, nam
 }
 
 func makeConfig(tokendingsURL string) (*config.Config, error) {
-	jwk, err := utils.GenerateJWK()
+	jwk, err := jwkutils.GenerateJWK()
 	if err != nil {
 		return nil, err
 	}

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nais/jwker/utils"
+	"github.com/nais/jwker/jwkutils"
 )
 
 func main() {
-	jwk, err := utils.GenerateJWK()
+	jwk, err := jwkutils.GenerateJWK()
 	if err != nil {
 		fmt.Printf("Error generating jwk: %s", err)
 		os.Exit(1)

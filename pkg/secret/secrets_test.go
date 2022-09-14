@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 )
 
 func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
@@ -32,7 +32,7 @@ func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
 }
 
 func TestExtractJWK(t *testing.T) {
-	jwk, err := utils.GenerateJWK()
+	jwk, err := jwkutils.GenerateJWK()
 	assert.NoError(t, err)
 
 	secret, err := GetAsSecret(jwk)
@@ -51,7 +51,7 @@ func TestCreateSecretSpec(t *testing.T) {
 		Cluster:   "test",
 	}
 	secretName := "test-secret"
-	jwk, err := utils.GenerateJWK()
+	jwk, err := jwkutils.GenerateJWK()
 	assert.NoError(t, err)
 
 	secretData := PodSecretData{

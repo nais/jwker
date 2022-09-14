@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -52,16 +51,16 @@ func init() {
 }
 
 func main() {
+	fmt.Println("starting")
 	zapLogger, err := setupZapLogger()
+	setupLog.Info("starting jwker")
 	if err != nil {
 		setupLog.Error(err, "unable to set up logger")
 		os.Exit(1)
 	}
 	ctrl.SetLogger(zapr.NewLogger(zapLogger))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-	cfg, err := config.New(ctx)
+	cfg, err := config.New()
 	if err != nil {
 		setupLog.Error(err, "initializing config")
 		os.Exit(1)
@@ -76,7 +75,6 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
 	reconciler := &controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
@@ -90,9 +88,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
 		os.Exit(1)
 	}
-
-	setupLog.Info("starting token refresh goroutine")
-	go reconciler.RefreshToken()
 
 	metrics.Registry.MustRegister()
 	setupLog.Info("starting metrics refresh goroutine")

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
 )
@@ -52,7 +52,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func TestGetTokenLocally(t *testing.T) {
 	clientid := "jwker-client-id"
 	scope := "tokendings"
-	jwk, err := utils.GenerateJWK()
+	jwk, err := jwkutils.GenerateJWK()
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	endpoint := "http://" + listener.Addr().String()
