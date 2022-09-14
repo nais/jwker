@@ -6,12 +6,10 @@ import (
 	"time"
 
 	"github.com/go-logr/zapr"
-	"github.com/nais/jwker/controllers/secret"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,20 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
-	k8sConfig := ctrl.GetConfigOrDie()
-	client, err := kubernetes.NewForConfig(k8sConfig)
-	if err != nil {
-		setupLog.Error(err, "unable to create kubernetes client")
-		os.Exit(1)
-	}
-
-	if err := secret.SetupJwkerJwk(ctx, client, cfg, ctrl.Log.WithName("bootstrap")); err != nil {
-		setupLog.Error(err, "unable to bootstrap secrets for jwker")
-		os.Exit(1)
-	}
-
-	mgr, err := ctrl.NewManager(k8sConfig, ctrl.Options{
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: cfg.MetricsAddr,
 	})
@@ -109,7 +94,7 @@ func main() {
 	go jwkermetrics.RefreshTotalJwkerClusterMetrics(mgr.GetClient())
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

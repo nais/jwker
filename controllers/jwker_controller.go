@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"github.com/nais/jwker/jwkutils"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
@@ -23,7 +24,6 @@ import (
 	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 )
 
 const (
@@ -94,7 +94,7 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 type transaction struct {
 	ctx         context.Context
 	req         ctrl.Request
-	keyset      utils.KeySet
+	keyset      jwkutils.KeySet
 	secretLists libernetes.SecretLists
 	jwker       jwkerv1.Jwker
 }
@@ -136,13 +136,13 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 
 	if r.shouldUpdateSecrets(jwker) || newJwk.Key == nil {
 		r.logger.Info("Generating new JWK")
-		newJwk, err = utils.GenerateJWK()
+		newJwk, err = jwkutils.GenerateJWK()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	keyset := utils.KeySetWithExisting(newJwk, existingJwks.Keys)
+	keyset := jwkutils.KeySetWithExisting(newJwk, existingJwks.Keys)
 
 	return &transaction{
 		ctx:         ctx,

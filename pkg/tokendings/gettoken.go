@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nais/jwker/utils"
+	"github.com/nais/jwker/jwkutils"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -45,7 +45,7 @@ func Claims(clientid, audience string) CustomClaims {
 		Subject:   clientid,
 		Expiry:    *exp,
 		NotBefore: 1,
-		ID:        utils.RandStringBytes(8),
+		ID:        jwkutils.RandStringBytes(8),
 		Audience:  audience,
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nais/jwker/jwkutils"
 	nais_io_v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
@@ -28,7 +29,6 @@ import (
 	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/nais/jwker/utils"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -132,7 +132,7 @@ func fixtures(cli client.Client) error {
 		return err
 	}
 
-	key, err := utils.GenerateJWK()
+	key, err := jwkutils.GenerateJWK()
 	if err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ func waitForDeletedSecret(ctx context.Context, cli client.Client, namespace, nam
 }
 
 func makeConfig(tokendingsURL string) (*config.Config, error) {
-	jwk, err := utils.GenerateJWK()
+	jwk, err := jwkutils.GenerateJWK()
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,6 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 		AuthProvider: config.AuthProvider{
 			ClientJwk: &jwk,
 		},
-		Namespace:   namespace,
 		ClusterName: "local",
 		Tokendings: config.Tokendings{
 			BaseURL: tokendingsURL,
@@ -383,6 +382,5 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 			},
 			WellKnownURL: tokendingsURL + "/.well-known/oauth/authorization-server",
 		},
-		SharedPublicSecretName: "shared-public-secret",
 	}, nil
 }
