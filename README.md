@@ -43,3 +43,4 @@ Run `token-exchange/src/test/kotlin/io/nais/security/oauth2/mock/MockTokenExchan
 
 Deploy to your local cluster using
 `make install && make deploy && make run`
+
