@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -51,14 +50,14 @@ func init() {
 }
 
 func main() {
-	fmt.Println("starting")
 	zapLogger, err := setupZapLogger()
+	ctrl.SetLogger(zapr.NewLogger(zapLogger))
+
 	setupLog.Info("starting jwker")
 	if err != nil {
 		setupLog.Error(err, "unable to set up logger")
 		os.Exit(1)
 	}
-	ctrl.SetLogger(zapr.NewLogger(zapLogger))
 
 	cfg, err := config.New()
 	if err != nil {
