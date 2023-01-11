@@ -51,13 +51,13 @@ func init() {
 
 func main() {
 	zapLogger, err := setupZapLogger()
-	ctrl.SetLogger(zapr.NewLogger(zapLogger))
-
-	setupLog.Info("starting jwker")
 	if err != nil {
-		setupLog.Error(err, "unable to set up logger")
+		log.Fatalf("unable to set up logger: %+v", err)
 		os.Exit(1)
 	}
+
+	ctrl.SetLogger(zapr.NewLogger(zapLogger))
+	setupLog.Info("starting jwker")
 
 	cfg, err := config.New()
 	if err != nil {
