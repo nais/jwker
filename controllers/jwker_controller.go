@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
-	"github.com/nais/jwker/jwkutils"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
@@ -18,6 +17,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/nais/jwker/jwkutils"
 
 	"github.com/nais/jwker/pkg/config"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
@@ -288,6 +289,10 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// delete unused secrets from cluster
 	for _, oldSecret := range tx.secretLists.Unused.Items {
+		if oldSecret.GetName() == jwker.Spec.SecretName {
+			continue
+		}
+
 		if err := r.Delete(tx.ctx, &oldSecret); err != nil {
 			r.logger.Error(err, "failed deletion")
 		}
