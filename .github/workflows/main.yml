@@ -2,51 +2,97 @@ name: Build and deploy jwker
 
 on:
   push:
-    branches:
-      - master
+    paths-ignore:
+      - 'README.md'
 
 env:
-  image: ghcr.io/${{ github.repository }}
+  GOOGLE_REGISTRY: europe-north1-docker.pkg.dev/nais-io/nais/images
+  GITHUB_REGISTRY: ghcr.io
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v3
-      - name: Extract version of Go to use
-        run: echo "GOVERSION=$(cat go.mod | grep -w "go" | awk ' { print $2 } ' | grep -w "^[^v]")" >> $GITHUB_ENV
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ env.GOVERSION }}
+          go-version: 1.19
           check-latest: true
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       - name: Setup Test
         run: |
           make kubebuilder
       - name: Test Go
         run: |
           make test
-  build:
-    needs:
-      - test
-    name: Checkout code and setup node
+  publish-images:
+    needs: test
+    name: Publish to Google and GitHub registries
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-20.04
+    permissions:
+      contents: "read"
+      id-token: "write"
+      packages: "write"
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Generate image environment variable
-        run: |
-          version=$(./version.sh)
-          echo "version=${version}" >> $GITHUB_ENV
-          echo "IMAGE=${image}:${version}" >> $GITHUB_ENV
-      - name: Login to GitHub Docker Registry
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: "auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          workload_identity_provider: ${{ secrets.NAIS_IO_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: "gh-jwker@nais-io.iam.gserviceaccount.com"
+          token_format: "access_token"
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Google Artifact Registry
         uses: docker/login-action@v2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
+          registry: ${{ env.GOOGLE_REGISTRY }}
+          username: "oauth2accesstoken"
+          password: "${{ steps.auth.outputs.access_token }}"
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build an push the Docker image
-        run: |
-          docker build --pull --tag ${IMAGE} .
-          docker push ${IMAGE}
+      - name: Docker meta
+        id: metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ env.GOOGLE_REGISTRY }}/jwker
+            ${{ env.GITHUB_REGISTRY }}/${{ github.repository }}
+          flavor: |
+            latest=true
+          # Docker tags based on the following events/attributes
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+            type=sha,prefix={{date 'YYYY-MM-DD'}}-
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
