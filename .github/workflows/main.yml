@@ -40,9 +40,22 @@ jobs:
       id-token: "write"
       packages: "write"
     runs-on: ubuntu-latest
+    env:
+      BUILDER_IMG: "cgr.dev/chainguard/go:1.19"
+      RUNNER_IMG: "cgr.dev/chainguard/static"
+      BASEIMG_IDENTITY: "https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main"
+      BASEIMG_ISSUER: "https://token.actions.githubusercontent.com"
     steps:
       - name: Checkout
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # ratchet:actions/checkout@v3
+      - name: Install cosign
+        uses: sigstore/cosign-installer@9e9de2292db7abb3f51b7f4808d98f0d347a8919 # ratchet:sigstore/cosign-installer@main
+        with:
+          cosign-release: 'v2.0.0'
+      - name: Verify builder image
+        run: cosign verify --certificate-identity ${{ env.BASEIMG_IDENTITY }} --certificate-oidc-issuer ${{ env.BASEIMG_ISSUER }} ${{ env.BUILDER_IMG }}
+      - name: Verify runner image
+        run: cosign verify --certificate-identity ${{ env.BASEIMG_IDENTITY }} --certificate-oidc-issuer ${{ env.BASEIMG_ISSUER }} ${{ env.RUNNER_IMG }}
       - id: "auth"
         name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@ef5d53e30bbcd8d0836f4288f5e50ff3e086997d" # ratchet:google-github-actions/auth@v1
@@ -94,10 +107,6 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Install cosign
-        uses: sigstore/cosign-installer@9e9de2292db7abb3f51b7f4808d98f0d347a8919 # ratchet:sigstore/cosign-installer@main
-        with:
-          cosign-release: 'v2.0.0'
       - name: Sign the container image
         run: |
           cosign sign --yes ${{ env.GOOGLE_REGISTRY }}/jwker@${{ steps.build-push.outputs.digest }}
