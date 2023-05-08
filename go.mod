@@ -14,9 +14,9 @@ require (
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/zap v1.24.0
 	gopkg.in/square/go-jose.v2 v2.6.0
-	k8s.io/api v0.26.3
+	k8s.io/api v0.27.1
 	k8s.io/apimachinery v0.27.1
-	k8s.io/client-go v0.26.3
+	k8s.io/client-go v0.27.1
 	sigs.k8s.io/controller-runtime v0.14.6
 )
 
@@ -51,7 +51,6 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
-	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
