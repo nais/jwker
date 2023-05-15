@@ -58,7 +58,7 @@ jobs:
         run: cosign verify --certificate-identity ${{ env.BASEIMG_IDENTITY }} --certificate-oidc-issuer ${{ env.BASEIMG_ISSUER }} ${{ env.RUNNER_IMG }}
       - id: "auth"
         name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@e8df18b60c5dd38ba618c121b779307266153fbf" # ratchet:google-github-actions/auth@v1
+        uses: "google-github-actions/auth@35b0e87d162680511bf346c299f71c9c5c379033" # ratchet:google-github-actions/auth@v1
         with:
           workload_identity_provider: ${{ secrets.NAIS_IO_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: "gh-jwker@nais-io.iam.gserviceaccount.com"
