@@ -42,6 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUNNER_IMG: "cgr.dev/chainguard/static"
+      BASEIMG_IDENTITY: "https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main"
       BASEIMG_ISSUER: "https://token.actions.githubusercontent.com"
     steps:
       - name: Checkout
