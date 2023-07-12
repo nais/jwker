@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM cgr.dev/chainguard/go:1.20 as builder
+FROM golang:1.20 as builder
 
 COPY . /workspace
 WORKDIR /workspace
