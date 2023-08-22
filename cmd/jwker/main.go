@@ -42,7 +42,13 @@ func init() {
 		TimestampFormat: time.RFC3339Nano,
 	}
 	log.SetFormatter(&formatter)
-	log.SetLevel(log.DebugLevel)
+
+	level, err := log.ParseLevel(strings.ToLower(os.Getenv("LOG_LEVEL")))
+	if err != nil {
+		log.SetLevel(log.InfoLevel)
+	}
+
+	log.SetLevel(level)
 
 	_ = clientgoscheme.AddToScheme(scheme)
 
