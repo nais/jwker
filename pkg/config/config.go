@@ -15,6 +15,7 @@ import (
 type Config struct {
 	AuthProvider AuthProvider
 	ClusterName  string
+	LogLevel     string
 	MetricsAddr  string
 	Tokendings   Tokendings
 }
@@ -45,6 +46,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.StringVar(&cfg.Tokendings.BaseURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "Base URL to Tokendings.")
 	flag.StringVar(&cfg.Tokendings.ClientID, "tokendings-client-id", os.Getenv("TOKENDINGS_CLIENT_ID"), "Client ID of Tokendings at Auth Provider")
+	flag.StringVar(&cfg.LogLevel, "log-level", "info", "Log level for jwker")
 	flag.Parse()
 
 	j, err := jwkutils.ParseJWK([]byte(clientJwkJson))

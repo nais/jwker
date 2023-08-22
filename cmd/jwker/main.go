@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-logr/zapr"
@@ -50,7 +51,13 @@ func init() {
 }
 
 func main() {
-	zapLogger, err := setupZapLogger()
+	cfg, err := config.New()
+	if err != nil {
+		setupLog.Error(err, "initializing config")
+		os.Exit(1)
+	}
+
+	zapLogger, err := setupZapLogger(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("unable to set up logger: %+v", err)
 		os.Exit(1)
@@ -58,12 +65,6 @@ func main() {
 
 	ctrl.SetLogger(zapr.NewLogger(zapLogger))
 	setupLog.Info("starting jwker")
-
-	cfg, err := config.New()
-	if err != nil {
-		setupLog.Error(err, "initializing config")
-		os.Exit(1)
-	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -99,9 +100,13 @@ func main() {
 	}
 }
 
-func setupZapLogger() (*zap.Logger, error) {
+func setupZapLogger(logLevel string) (*zap.Logger, error) {
 	loggerConfig := zap.NewProductionConfig()
-	loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	level, err := zap.ParseAtomicLevel(strings.ToLower(logLevel))
+	if err != nil {
+		return nil, err
+	}
+	loggerConfig.Level = level
 	loggerConfig.EncoderConfig.TimeKey = "timestamp"
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 	return loggerConfig.Build()
