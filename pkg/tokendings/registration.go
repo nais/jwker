@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -64,7 +64,7 @@ func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string,
 		return nil
 	}
 
-	msg, _ := ioutil.ReadAll(resp.Body)
+	msg, _ := io.ReadAll(resp.Body)
 
 	return fmt.Errorf("delete client from tokendings: %s: %s", resp.Status, msg)
 }
@@ -119,7 +119,7 @@ func RegisterClient(cr ClientRegistration, accessToken string, tokenDingsUrl str
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
-		response, _ := ioutil.ReadAll(resp.Body)
+		response, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unable to register application with tokendings: %s: %s", resp.Status, response)
 	}
 
