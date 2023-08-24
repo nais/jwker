@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	nais_io_v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
-	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -217,15 +217,16 @@ func TestReconciler(t *testing.T) {
 
 	tokendingsServer := httptest.NewServer(&tokendingsHandler{})
 	cfg, err := makeConfig(tokendingsServer.URL)
-	assert.NoError(t, err)
+	if err != nil {
+		log.Fatalf("unable to create tokendings instances: %+v", err)
+	}
 
 	jwker := &controllers.JwkerReconciler{
-		Client:          cli,
-		Log:             ctrl.Log.WithName("controllers").WithName("Jwker"),
-		Recorder:        mgr.GetEventRecorderFor("jwker"),
-		Scheme:          mgr.GetScheme(),
-		TokendingsToken: &tokendings.TokenResponse{},
-		Config:          cfg,
+		Client:   cli,
+		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Recorder: mgr.GetEventRecorderFor("jwker"),
+		Scheme:   mgr.GetScheme(),
+		Config:   cfg,
 	}
 
 	err = jwker.SetupWithManager(mgr)
@@ -255,6 +256,15 @@ func TestReconciler(t *testing.T) {
 
 	// secret must have data
 	assert.NotEmpty(t, sec.Data[secret.TokenXPrivateJwkKey])
+
+	t.Run("should contain secret data", func(t *testing.T) {
+		assert.NoError(t, err)
+		assert.Equal(t, "local:default:app1", string(sec.Data[secret.TokenXClientIdKey]))
+		assert.Equal(t, fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsServer.URL), string(sec.Data[secret.TokenXWellKnownUrlKey]))
+		assert.Equal(t, fmt.Sprintf("%s", tokendingsServer.URL), string(sec.Data[secret.TokenXIssuerKey]))
+		assert.Equal(t, fmt.Sprintf("%s/jwks", tokendingsServer.URL), string(sec.Data[secret.TokenXJwksUriKey]))
+		assert.Equal(t, fmt.Sprintf("%s/token", tokendingsServer.URL), string(sec.Data[secret.TokenXTokenEndpointKey]))
+	})
 
 	// existing, in-use secret should be preserved
 	sec, err = getSecret(ctx, cli, namespace, alreadyInUseSecret)
@@ -367,20 +377,11 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 	}
 
 	return &config.Config{
-		AuthProvider: config.AuthProvider{
-			ClientJwk: &jwk,
-		},
+		ClientID:    "jwker",
+		ClientJwk:   &jwk,
 		ClusterName: "local",
-		Tokendings: config.Tokendings{
-			BaseURL: tokendingsURL,
-			Metadata: &oauth.MetadataOAuth{
-				MetadataCommon: oauth.MetadataCommon{
-					Issuer:        tokendingsURL,
-					JwksURI:       tokendingsURL + "/jwks",
-					TokenEndpoint: tokendingsURL + "/token",
-				},
-			},
-			WellKnownURL: tokendingsURL + "/.well-known/oauth/authorization-server",
+		TokendingsInstances: []*tokendings.Instance{
+			tokendings.NewInstance(tokendingsURL, "jwker", &jwk),
 		},
 	}, nil
 }

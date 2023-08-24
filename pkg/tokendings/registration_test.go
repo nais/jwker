@@ -3,10 +3,11 @@ package tokendings
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -66,21 +67,35 @@ var (
 	}
 )
 
+func TestNewInstance(t *testing.T) {
+	jwk, err := jwkutils.GenerateJWK()
+	assert.NoError(t, err)
+	inst1 := NewInstance("http://localhost:8080", "jwker", &jwk)
+	inst2 := NewInstance("http://localhost:8080/", "jwker", &jwk)
+	assert.Equal(t, "http://localhost:8080/.well-known/oauth-authorization-server", inst1.WellKnownURL)
+	assert.Equal(t, "http://localhost:8080/.well-known/oauth-authorization-server", inst2.WellKnownURL)
+}
+
 func TestDeleteClient(t *testing.T) {
+	jwk, err := jwkutils.GenerateJWK()
+	assert.NoError(t, err)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/registration/client/cluster1:team1:app1", r.URL.Path)
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+		verifyToken(t, r, jwk)
+
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
 
-	err := DeleteClient(context.Background(), "token", server.URL, ClientId{
+	td := NewInstance(server.URL, "jwker", &jwk)
+
+	err = td.DeleteClient(context.Background(), ClientId{
 		Name:      "app1",
 		Namespace: "team1",
 		Cluster:   "cluster1",
 	})
-	fmt.Printf("Error: %v\n", err)
 	assert.NoError(t, err)
 }
 
@@ -91,21 +106,27 @@ func TestRegisterClient(t *testing.T) {
 		Cluster:   "cluster1",
 	}
 
+	jwk, err := jwkutils.GenerateJWK()
+	assert.NoError(t, err)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		assert.Equal(t, "/registration/client", r.URL.Path)
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+
+		verifyToken(t, r, jwk)
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		var clientRegistration ClientRegistration
 		err = json.Unmarshal(body, &clientRegistration)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		assert.Equal(t, app.String(), clientRegistration.ClientName)
 		assert.Equal(t, 1, len(clientRegistration.Jwks.Keys))
@@ -115,10 +136,8 @@ func TestRegisterClient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	jwk, err := jwkutils.GenerateJWK()
-	assert.NoError(t, err)
-
-	err = RegisterClient(ClientRegistration{
+	td := NewInstance(server.URL, "jwker", &jwk)
+	err = td.RegisterClient(ClientRegistration{
 		ClientName: app.String(),
 		Jwks: jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{
@@ -126,7 +145,7 @@ func TestRegisterClient(t *testing.T) {
 			},
 		},
 		SoftwareStatement: "signedstatement",
-	}, "token", server.URL)
+	})
 
 	assert.NoError(t, err)
 }
@@ -165,4 +184,22 @@ func TestMakeClientRegistration(t *testing.T) {
 	}
 
 	assert.Equal(t, test.softwareStatement, string(js))
+}
+
+func verifyToken(t *testing.T, r *http.Request, jwk jose.JSONWebKey) {
+	raw := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
+	sign, err := jose.ParseSigned(raw)
+	payload, err := sign.Verify(jwk.Public())
+	assert.NoError(t, err)
+
+	claims := CustomClaims{}
+	err = json.Unmarshal(payload, &claims)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "jwker", claims.Issuer)
+	assert.Equal(t, "jwker", claims.Subject)
+
+	aud, err := url.Parse(claims.Audience)
+	assert.NoError(t, err)
+	assert.Equal(t, "/registration/client", aud.Path)
 }

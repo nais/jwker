@@ -3,9 +3,10 @@ package config
 import (
 	"flag"
 	"fmt"
+	"github.com/nais/jwker/pkg/tokendings"
 	"net/url"
 	"os"
-	"path"
+	"strings"
 
 	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/liberator/pkg/oauth"
@@ -13,11 +14,12 @@ import (
 )
 
 type Config struct {
-	AuthProvider AuthProvider
-	ClusterName  string
-	LogLevel     string
-	MetricsAddr  string
-	Tokendings   Tokendings
+	ClientID            string
+	ClientJwk           *jose.JSONWebKey
+	ClusterName         string
+	LogLevel            string
+	MetricsAddr         string
+	TokendingsInstances []*tokendings.Instance
 }
 
 type Tokendings struct {
@@ -26,20 +28,17 @@ type Tokendings struct {
 	WellKnownURL string
 }
 
-type AuthProvider struct {
-	ClientID  string
-	ClientJwk *jose.JSONWebKey
-}
-
 func New() (*Config, error) {
 	cfg := &Config{}
-	cfg.Tokendings.Metadata = &oauth.MetadataOAuth{}
 	var clientJwkJson string
+	var instanceString string
+	var tokendingsURL string
 	flag.StringVar(&clientJwkJson, "client-jwk-json", os.Getenv("JWKER_PRIVATE_JWK"), "json with private JWK credential")
-	flag.StringVar(&cfg.AuthProvider.ClientID, "client-id", os.Getenv("JWKER_CLIENT_ID"), "Client ID of Jwker at Auth Provider.")
+	flag.StringVar(&cfg.ClientID, "client-id", os.Getenv("JWKER_CLIENT_ID"), "Client ID of Jwker at Auth Provider.")
 	flag.StringVar(&cfg.ClusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "nais cluster")
 	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
-	flag.StringVar(&cfg.Tokendings.BaseURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "Base URL to Tokendings.")
+	flag.StringVar(&tokendingsURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "The base URL to Tokendings.")
+	flag.StringVar(&instanceString, "tokendings-instances", os.Getenv("TOKENDINGS_INSTANCES"), "Comma separated list of baseUrls to Tokendings instances.")
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "Log level for jwker")
 	flag.Parse()
 
@@ -47,18 +46,20 @@ func New() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.AuthProvider.ClientJwk = j
+	cfg.ClientJwk = j
 
-	cfg.Tokendings.Metadata.Issuer = cfg.Tokendings.BaseURL
-	cfg.Tokendings.Metadata.JwksURI = fmt.Sprintf("%s/jwks", cfg.Tokendings.BaseURL)
-	cfg.Tokendings.Metadata.TokenEndpoint = fmt.Sprintf("%s/token", cfg.Tokendings.BaseURL)
-
-	tokendingsWellKnownURL, err := url.Parse(cfg.Tokendings.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base url for tokendings: %w", err)
+	instances := make([]*tokendings.Instance, 0)
+	raw := strings.TrimSpace(instanceString)
+	if raw == "" {
+		raw = tokendingsURL
 	}
-	tokendingsWellKnownURL.Path = path.Join(tokendingsWellKnownURL.Path, oauth.WellKnownOAuthPath)
-	cfg.Tokendings.WellKnownURL = tokendingsWellKnownURL.String()
+	for _, u := range strings.Split(raw, ",") {
+		_, err := url.Parse(strings.TrimSpace(u))
+		if err != nil {
+			return nil, fmt.Errorf("invalid base url for tokendings instance: %w", err)
+		}
+		instances = append(instances, tokendings.NewInstance(u, cfg.ClientID, cfg.ClientJwk))
+	}
 
 	return cfg, nil
 }
