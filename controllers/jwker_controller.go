@@ -151,9 +151,6 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	}
 
 	instances := r.Config.TokendingsInstances
-	if len(instances) == 0 {
-		return fmt.Errorf("no tokendings instances configured, cannot create resources")
-	}
 	r.logger.Info(fmt.Sprintf("Registering app %s with %d tokendings instances", app.String(), len(instances)))
 
 	for _, instance := range instances {

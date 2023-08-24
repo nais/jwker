@@ -61,5 +61,10 @@ func New() (*Config, error) {
 		instances = append(instances, tokendings.NewInstance(u, cfg.ClientID, cfg.ClientJwk))
 	}
 
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no tokendings instances configured")
+	}
+	cfg.TokendingsInstances = instances
+
 	return cfg, nil
 }
