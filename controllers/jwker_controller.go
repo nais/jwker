@@ -160,10 +160,6 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		}
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed registering client: %s", err)
-	}
-
 	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Name, app.Namespace))
 
 	jwk, err := secret.FirstJWK(tx.keyset.Private)
