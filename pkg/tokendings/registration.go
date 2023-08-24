@@ -40,7 +40,6 @@ type ClientRegistrationResponse struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 }
 
-// TODO: sign
 type SoftwareStatement struct {
 	AppId                string   `json:"appId"`
 	AccessPolicyInbound  []string `json:"accessPolicyInbound"`

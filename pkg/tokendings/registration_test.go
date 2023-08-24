@@ -1,7 +1,12 @@
-package tokendings_test
+package tokendings
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -10,8 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/nais/jwker/pkg/tokendings"
 )
 
 type clientRegistrationTest struct {
@@ -63,6 +66,71 @@ var (
 	}
 )
 
+func TestDeleteClient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/registration/client/cluster1:team1:app1", r.URL.Path)
+		assert.Equal(t, "DELETE", r.Method)
+		assert.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	err := DeleteClient(context.Background(), "token", server.URL, ClientId{
+		Name:      "app1",
+		Namespace: "team1",
+		Cluster:   "cluster1",
+	})
+	fmt.Printf("Error: %v\n", err)
+	assert.NoError(t, err)
+}
+
+func TestRegisterClient(t *testing.T) {
+	app := ClientId{
+		Name:      "app1",
+		Namespace: "team1",
+		Cluster:   "cluster1",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		assert.Equal(t, "/registration/client", r.URL.Path)
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+
+		var clientRegistration ClientRegistration
+		err = json.Unmarshal(body, &clientRegistration)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		assert.Equal(t, app.String(), clientRegistration.ClientName)
+		assert.Equal(t, 1, len(clientRegistration.Jwks.Keys))
+		assert.Equal(t, "signedstatement", clientRegistration.SoftwareStatement)
+
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	jwk, err := jwkutils.GenerateJWK()
+	assert.NoError(t, err)
+
+	err = RegisterClient(ClientRegistration{
+		ClientName: app.String(),
+		Jwks: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{
+				jwk,
+			},
+		},
+		SoftwareStatement: "signedstatement",
+	}, "token", server.URL)
+
+	assert.NoError(t, err)
+}
+
 func TestMakeClientRegistration(t *testing.T) {
 	signkey, err := jwkutils.GenerateJWK()
 	if err != nil {
@@ -75,13 +143,13 @@ func TestMakeClientRegistration(t *testing.T) {
 	}
 	appkeys := jwkutils.KeySetWithExisting(appkey, []jose.JSONWebKey{})
 
-	clientid := tokendings.ClientId{
+	clientid := ClientId{
 		Name:      "myapplication",
 		Namespace: "mynamespace",
 		Cluster:   "mycluster",
 	}
 
-	output, err := tokendings.MakeClientRegistration(&signkey, &appkeys.Public, clientid, test.input)
+	output, err := MakeClientRegistration(&signkey, &appkeys.Public, clientid, test.input)
 
 	assert.NoError(t, err)
 	assert.Equal(t, test.clientName, output.ClientName)
