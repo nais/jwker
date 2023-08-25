@@ -28,20 +28,18 @@ import (
 )
 
 const (
-	refreshTokenRetryInterval = 10 * time.Second
-	requeueInterval           = 10 * time.Second
+	requeueInterval = 10 * time.Second
 )
 
 // JwkerReconciler reconciles a Jwker object
 type JwkerReconciler struct {
 	client.Client
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	Reader          client.Reader
-	Recorder        record.EventRecorder
-	logger          logr.Logger
-	TokendingsToken *tokendings.TokenResponse
-	Config          *config.Config
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Reader   client.Reader
+	Recorder record.EventRecorder
+	logger   logr.Logger
+	Config   *config.Config
 }
 
 func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
@@ -52,25 +50,6 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 	}
 }
 
-func (r *JwkerReconciler) CreateToken() {
-	jwk := r.Config.AuthProvider.ClientJwk
-	clientID := r.Config.AuthProvider.ClientID
-	endpoint := fmt.Sprintf("%s/registration/client", r.Config.Tokendings.BaseURL)
-
-	var err error
-
-	jwt, err := tokendings.ClientAssertion(jwk, clientID, endpoint)
-	if err != nil {
-		r.Log.Error(err, "failed to generate client assertion")
-	}
-	r.TokendingsToken = &tokendings.TokenResponse{
-		AccessToken: jwt,
-		TokenType:   "Bearer",
-		ExpiresIn:   0,
-		Scope:       "",
-	}
-}
-
 // delete all associated objects
 // TODO: needs finalizer
 func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
@@ -78,9 +57,12 @@ func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
 
 	r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
 
-	r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from tokendings", req.Name, req.Namespace))
-	if err := tokendings.DeleteClient(ctx, r.TokendingsToken.AccessToken, r.Config.Tokendings.BaseURL, aid); err != nil {
-		return fmt.Errorf("deleting resource from Tokendings: %s", err)
+	r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from %d tokendings instances", req.Name, req.Namespace, len(r.Config.TokendingsInstances)))
+	for _, instance := range r.Config.TokendingsInstances {
+		r.logger.Info(fmt.Sprintf("Deleting client from tokendings instance %s", instance.BaseURL))
+		if err := instance.DeleteClient(ctx, aid); err != nil {
+			return fmt.Errorf("deleting resource from Tokendings instance '%s': %w", instance.BaseURL, err)
+		}
 	}
 
 	r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from cluster", req.Name, req.Namespace))
@@ -158,7 +140,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	app := r.appClientID(tx.req)
 
 	cr, err := tokendings.MakeClientRegistration(
-		r.Config.AuthProvider.ClientJwk,
+		r.Config.ClientJwk,
 		&tx.keyset.Public,
 		app,
 		tx.jwker,
@@ -168,15 +150,14 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		return fmt.Errorf("create client registration payload: %s", err)
 	}
 
-	r.logger.Info(fmt.Sprintf("Registering app %s with tokendings", app.String()))
-	err = tokendings.RegisterClient(
-		*cr,
-		r.TokendingsToken.AccessToken,
-		r.Config.Tokendings.BaseURL,
-	)
+	instances := r.Config.TokendingsInstances
+	r.logger.Info(fmt.Sprintf("Registering app %s with %d tokendings instances", app.String(), len(instances)))
 
-	if err != nil {
-		return fmt.Errorf("failed registering client: %s", err)
+	for _, instance := range instances {
+		r.logger.Info(fmt.Sprintf("Registering client with tokendings instance %s", instance.BaseURL))
+		if err := instance.RegisterClient(*cr); err != nil {
+			return fmt.Errorf("registering client with Tokendings instance '%s': %w", instance.BaseURL, err)
+		}
 	}
 
 	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Name, app.Namespace))
@@ -187,9 +168,13 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	}
 
 	secretData := secret.PodSecretData{
-		ClientId:         app,
-		Jwk:              *jwk,
-		TokendingsConfig: r.Config.Tokendings,
+		ClientId: app,
+		Jwk:      *jwk,
+		TokendingsConfig: config.Tokendings{
+			BaseURL:      instances[0].BaseURL,
+			Metadata:     instances[0].Metadata,
+			WellKnownURL: instances[0].WellKnownURL,
+		},
 	}
 
 	if err := secret.CreateAppSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
@@ -208,8 +193,6 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	var jwker jwkerv1.Jwker
 
 	jwkermetrics.JwkersProcessedCount.Inc()
-
-	r.CreateToken()
 
 	r.logger = r.Log.WithValues(
 		"jwker", req.NamespacedName,

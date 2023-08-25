@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-
 	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/oauth"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
 )
 
 type ClientId struct {
@@ -40,18 +41,48 @@ type ClientRegistrationResponse struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 }
 
-// TODO: sign
 type SoftwareStatement struct {
 	AppId                string   `json:"appId"`
 	AccessPolicyInbound  []string `json:"accessPolicyInbound"`
 	AccessPolicyOutbound []string `json:"accessPolicyOutbound"`
 }
 
-func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string, appClientId ClientId) error {
-	request, err := http.NewRequestWithContext(ctx, "DELETE", fmt.Sprintf("%s/registration/client/%s", tokenDingsUrl, url.QueryEscape(appClientId.String())), nil)
+type Instance struct {
+	BaseURL      string
+	ClientID     string
+	ClientJwk    *jose.JSONWebKey
+	Metadata     *oauth.MetadataOAuth
+	WellKnownURL string
+}
+
+func NewInstance(baseURL, clientID string, clientJwk *jose.JSONWebKey) *Instance {
+	i := &Instance{
+		BaseURL:   baseURL,
+		ClientID:  clientID,
+		ClientJwk: clientJwk,
+	}
+
+	i.Metadata = &oauth.MetadataOAuth{}
+	i.Metadata.Issuer = i.BaseURL
+	i.Metadata.JwksURI = fmt.Sprintf("%s/jwks", i.BaseURL)
+	i.Metadata.TokenEndpoint = fmt.Sprintf("%s/token", i.BaseURL)
+	i.WellKnownURL = fmt.Sprintf("%s%s", strings.TrimSuffix(i.BaseURL, "/"), oauth.WellKnownOAuthPath)
+	return i
+}
+
+func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientId) error {
+	endpoint := fmt.Sprintf("%s/registration/client", t.BaseURL)
+
+	request, err := http.NewRequestWithContext(ctx, "DELETE", fmt.Sprintf("%s/%s", endpoint, url.QueryEscape(appClientId.String())), nil)
 	if err != nil {
 		return err
 	}
+
+	accessToken, err := ClientAssertion(t.ClientJwk, t.ClientID, endpoint)
+	if err != nil {
+		return fmt.Errorf("unable to create token for invoking tokendings: %w", err)
+	}
+
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	client := http.Client{}
 	resp, err := client.Do(request)
@@ -64,7 +95,7 @@ func DeleteClient(ctx context.Context, accessToken string, tokenDingsUrl string,
 		return nil
 	}
 
-	msg, _ := ioutil.ReadAll(resp.Body)
+	msg, _ := io.ReadAll(resp.Body)
 
 	return fmt.Errorf("delete client from tokendings: %s: %s", resp.Status, msg)
 }
@@ -99,16 +130,23 @@ func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *
 	}, nil
 }
 
-func RegisterClient(cr ClientRegistration, accessToken string, tokenDingsUrl string) error {
+func (t *Instance) RegisterClient(cr ClientRegistration) error {
+	endpoint := fmt.Sprintf("%s/registration/client", t.BaseURL)
+
 	data, err := json.Marshal(cr)
 	if err != nil {
 		return err
 	}
-	request, err := http.NewRequest("POST", fmt.Sprintf("%s/registration/client", tokenDingsUrl), bytes.NewReader(data))
+	request, err := http.NewRequest("POST", endpoint, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	request.Header.Add("Content-Type", "application/json")
+
+	accessToken, err := ClientAssertion(t.ClientJwk, t.ClientID, endpoint)
+	if err != nil {
+		return fmt.Errorf("unable to create token for invoking tokendings: %w", err)
+	}
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	client := http.Client{}
@@ -119,7 +157,7 @@ func RegisterClient(cr ClientRegistration, accessToken string, tokenDingsUrl str
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
-		response, _ := ioutil.ReadAll(resp.Body)
+		response, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unable to register application with tokendings: %s: %s", resp.Status, response)
 	}
 
