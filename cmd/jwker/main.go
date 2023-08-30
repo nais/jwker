@@ -59,14 +59,12 @@ func init() {
 func main() {
 	cfg, err := config.New()
 	if err != nil {
-		setupLog.Error(err, "initializing config")
-		os.Exit(1)
+		log.Fatalf("initializing config: %+v", err)
 	}
 
 	zapLogger, err := setupZapLogger(cfg.LogLevel)
 	if err != nil {
 		log.Fatalf("unable to set up logger: %+v", err)
-		os.Exit(1)
 	}
 
 	ctrl.SetLogger(zapr.NewLogger(zapLogger))
