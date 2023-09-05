@@ -3,23 +3,26 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/nais/jwker/pkg/tokendings"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
-	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/liberator/pkg/oauth"
 	"gopkg.in/square/go-jose.v2"
+
+	"github.com/nais/jwker/jwkutils"
+	"github.com/nais/jwker/pkg/tokendings"
 )
 
 type Config struct {
-	ClientID            string
-	ClientJwk           *jose.JSONWebKey
-	ClusterName         string
-	LogLevel            string
-	MetricsAddr         string
-	TokendingsInstances []*tokendings.Instance
+	ClientID                string
+	ClientJwk               *jose.JSONWebKey
+	ClusterName             string
+	LogLevel                string
+	MaxConcurrentReconciles int
+	MetricsAddr             string
+	TokendingsInstances     []*tokendings.Instance
 }
 
 type Tokendings struct {
@@ -36,6 +39,7 @@ func New() (*Config, error) {
 	flag.StringVar(&clientJwkJson, "client-jwk-json", os.Getenv("JWKER_PRIVATE_JWK"), "json with private JWK credential")
 	flag.StringVar(&cfg.ClientID, "client-id", os.Getenv("JWKER_CLIENT_ID"), "Client ID of Jwker at Auth Provider.")
 	flag.StringVar(&cfg.ClusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "nais cluster")
+	flag.IntVar(&cfg.MaxConcurrentReconciles, "max-concurrent-reconciles", 20, "Max concurrent reconciles for controller.")
 	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
 	flag.StringVar(&tokendingsURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "The base URL to Tokendings.")
 	flag.StringVar(&instanceString, "tokendings-instances", os.Getenv("TOKENDINGS_INSTANCES"), "Comma separated list of baseUrls to Tokendings instances.")
@@ -47,6 +51,13 @@ func New() (*Config, error) {
 		return nil, err
 	}
 	cfg.ClientJwk = j
+
+	maxConcurrentReconciles, ok := os.LookupEnv("JWKER_MAX_CONCURRENT_RECONCILES")
+	if ok {
+		if mcr, err := strconv.Atoi(maxConcurrentReconciles); err != nil {
+			cfg.MaxConcurrentReconciles = mcr
+		}
+	}
 
 	instances := make([]*tokendings.Instance, 0)
 	raw := strings.TrimSpace(instanceString)

@@ -17,9 +17,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"github.com/nais/jwker/jwkutils"
-
 	"github.com/nais/jwker/pkg/config"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
 	"github.com/nais/jwker/pkg/pods"
@@ -309,7 +309,11 @@ func (r *JwkerReconciler) reportError(err error, message string) {
 }
 
 func (r *JwkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	opts := controller.Options{
+		MaxConcurrentReconciles: r.Config.MaxConcurrentReconciles,
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&jwkerv1.Jwker{}).
+		WithOptions(opts).
 		Complete(r)
 }
