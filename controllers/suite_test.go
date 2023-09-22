@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nais/jwker/jwkutils"
 	nais_io_v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
@@ -24,8 +23,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlmetricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/nais/jwker/controllers"
+	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
@@ -210,8 +211,10 @@ func TestReconciler(t *testing.T) {
 	assert.NotNil(t, cli)
 
 	mgr, err := ctrl.NewManager(testEnv.Config, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
+		Scheme: scheme.Scheme,
+		Metrics: ctrlmetricsserver.Options{
+			BindAddress: "0",
+		},
 	})
 	assert.NoError(t, err)
 

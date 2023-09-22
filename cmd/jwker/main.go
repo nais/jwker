@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-logr/zapr"
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -14,8 +15,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
-
-	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	ctrlmetricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/nais/jwker/controllers"
 	"github.com/nais/jwker/pkg/config"
@@ -71,8 +71,10 @@ func main() {
 	setupLog.Info("starting jwker")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: cfg.MetricsAddr,
+		Scheme: scheme,
+		Metrics: ctrlmetricsserver.Options{
+			BindAddress: cfg.MetricsAddr,
+		},
 	})
 
 	if err != nil {
