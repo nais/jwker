@@ -18,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
@@ -177,8 +178,22 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		},
 	}
 
-	if err := secret.CreateAppSecret(r.Client, tx.ctx, tx.jwker.Spec.SecretName, secretData); err != nil {
-		return fmt.Errorf("reconciling secrets: %s", err)
+	secretSpec, err := secret.CreateSecretSpec(tx.jwker.Spec.SecretName, secretData)
+	if err != nil {
+		return fmt.Errorf("creating secret spec: %w", err)
+	}
+
+	err = controllerutil.SetOwnerReference(&tx.jwker, secretSpec, r.Scheme)
+	if err != nil {
+		return fmt.Errorf("setting owner reference: %w", err)
+	}
+
+	err = r.Client.Create(tx.ctx, secretSpec)
+	if errors.IsAlreadyExists(err) {
+		err = r.Client.Update(tx.ctx, secretSpec)
+	}
+	if err != nil {
+		return fmt.Errorf("apply secret: %w", err)
 	}
 
 	return nil

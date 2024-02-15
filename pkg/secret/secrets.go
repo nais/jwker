@@ -8,7 +8,6 @@ import (
 
 	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -86,46 +85,13 @@ func extractOldJwk(sec corev1.Secret) (*jose.JSONWebKey, error) {
 	return nil, errors.New(fmt.Sprintf("failed to find any expected keys in secret '%s'", sec.Name))
 }
 
-func CreateSecret(
-	ctx context.Context,
-	client client.Client,
-	secretName string,
-	namespace string,
-	labels, data map[string]string,
-) (*corev1.Secret, error) {
-	s := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-			Labels:    labels,
-		},
-		StringData: data,
-		Type:       "Opaque",
-	}
-
-	err := client.Create(ctx, &s)
-	if k8serrors.IsAlreadyExists(err) {
-		err = client.Update(ctx, &s)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to apply secretSpec: %s", err)
-	}
-
-	return &s, nil
-}
-
-func CreateSecretSpec(secretName string, data PodSecretData) (corev1.Secret, error) {
+func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, error) {
 	stringdata, err := stringData(data)
 	if err != nil {
-		return corev1.Secret{}, err
+		return nil, err
 	}
 
-	return corev1.Secret{
+	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
@@ -138,24 +104,6 @@ func CreateSecretSpec(secretName string, data PodSecretData) (corev1.Secret, err
 		StringData: stringdata,
 		Type:       "Opaque",
 	}, nil
-}
-
-func CreateAppSecret(cli client.Client, ctx context.Context, secretName string, data PodSecretData) error {
-	secretSpec, err := CreateSecretSpec(secretName, data)
-	if err != nil {
-		return fmt.Errorf("Unable to create secretSpec object: %s", err)
-	}
-
-	err = cli.Create(ctx, &secretSpec)
-	if k8serrors.IsAlreadyExists(err) {
-		err = cli.Update(ctx, &secretSpec)
-	}
-
-	if err != nil {
-		return fmt.Errorf("Unable to apply secretSpec: %s", err)
-	}
-
-	return nil
 }
 
 func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string) error {

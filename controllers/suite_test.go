@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	nais_io_v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // for side effects only
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -76,18 +76,18 @@ func fixtures(cli client.Client) error {
 
 	err = cli.Create(
 		ctx,
-		&nais_io_v1.Jwker{
-			TypeMeta: v1.TypeMeta{
+		&naisiov1.Jwker{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Jwker",
 				APIVersion: "nais.io/v1",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      appName,
 				Namespace: namespace,
 			},
-			Spec: nais_io_v1.JwkerSpec{
+			Spec: naisiov1.JwkerSpec{
 				SecretName:   secretName,
-				AccessPolicy: &nais_io_v1.AccessPolicy{},
+				AccessPolicy: &naisiov1.AccessPolicy{},
 			},
 		},
 	)
@@ -98,11 +98,11 @@ func fixtures(cli client.Client) error {
 	err = cli.Create(
 		ctx,
 		&corev1.Pod{
-			TypeMeta: v1.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Pod",
 				APIVersion: "v1",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      appName,
 				Namespace: namespace,
 				Labels: map[string]string{
@@ -146,11 +146,11 @@ func fixtures(cli client.Client) error {
 	err = cli.Create(
 		ctx,
 		&corev1.Secret{
-			TypeMeta: v1.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Secret",
 				APIVersion: "v1",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      alreadyInUseSecret,
 				Namespace: namespace,
 				Labels: map[string]string{
@@ -170,11 +170,11 @@ func fixtures(cli client.Client) error {
 	err = cli.Create(
 		ctx,
 		&corev1.Secret{
-			TypeMeta: v1.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Secret",
 				APIVersion: "v1",
 			},
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      expiredSecret,
 				Namespace: namespace,
 				Labels: map[string]string{
@@ -191,24 +191,18 @@ func fixtures(cli client.Client) error {
 func TestReconciler(t *testing.T) {
 	ctrl.SetLogger(zap.New())
 
-	crdPath := crd.YamlDirectory()
-
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{crdPath},
+		CRDDirectoryPaths: []string{crd.YamlDirectory()},
 	}
 
 	k8scfg, err := testEnv.Start()
 	assert.NoError(t, err)
 	assert.NotNil(t, k8scfg)
 
-	err = nais_io_v1.AddToScheme(scheme.Scheme)
+	err = naisiov1.AddToScheme(scheme.Scheme)
 	assert.NoError(t, err)
 
 	// +kubebuilder:scaffold:scheme
-
-	cli, err = client.New(k8scfg, client.Options{Scheme: scheme.Scheme})
-	assert.NoError(t, err)
-	assert.NotNil(t, cli)
 
 	mgr, err := ctrl.NewManager(testEnv.Config, ctrl.Options{
 		Scheme: scheme.Scheme,
@@ -216,6 +210,8 @@ func TestReconciler(t *testing.T) {
 			BindAddress: "0",
 		},
 	})
+
+	cli = mgr.GetClient()
 	assert.NoError(t, err)
 
 	tokendingsServer := httptest.NewServer(&tokendingsHandler{})
@@ -224,15 +220,13 @@ func TestReconciler(t *testing.T) {
 		log.Fatalf("unable to create tokendings instances: %+v", err)
 	}
 
-	jwker := &controllers.JwkerReconciler{
+	err = (&controllers.JwkerReconciler{
 		Client:   cli,
 		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
 		Recorder: mgr.GetEventRecorderFor("jwker"),
 		Scheme:   mgr.GetScheme(),
 		Config:   cfg,
-	}
-
-	err = jwker.SetupWithManager(mgr)
+	}).SetupWithManager(mgr)
 	assert.NoError(t, err)
 
 	// insert data into the cluster
@@ -253,56 +247,49 @@ func TestReconciler(t *testing.T) {
 	}()
 
 	// wait for synced secret until timeout
-	sec, err := getSecretWithTimeout(ctx, cli, namespace, secretName)
+	currentSecret, err := getSecretWithTimeout(ctx, cli, namespace, secretName)
 	assert.NoError(t, err)
-	assert.NotNil(t, sec)
+	assert.NotNil(t, currentSecret)
 
 	// secret must have data
-	assert.NotEmpty(t, sec.Data[secret.TokenXPrivateJwkKey])
+	assert.NotEmpty(t, currentSecret.Data[secret.TokenXPrivateJwkKey])
 
 	t.Run("should contain secret data", func(t *testing.T) {
 		assert.NoError(t, err)
-		assert.Equal(t, "local:default:app1", string(sec.Data[secret.TokenXClientIdKey]))
-		assert.Equal(t, fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsServer.URL), string(sec.Data[secret.TokenXWellKnownUrlKey]))
-		assert.Equal(t, fmt.Sprintf("%s", tokendingsServer.URL), string(sec.Data[secret.TokenXIssuerKey]))
-		assert.Equal(t, fmt.Sprintf("%s/jwks", tokendingsServer.URL), string(sec.Data[secret.TokenXJwksUriKey]))
-		assert.Equal(t, fmt.Sprintf("%s/token", tokendingsServer.URL), string(sec.Data[secret.TokenXTokenEndpointKey]))
+		assert.Equal(t, "local:default:app1", string(currentSecret.Data[secret.TokenXClientIdKey]))
+		assert.Equal(t, fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXWellKnownUrlKey]))
+		assert.Equal(t, fmt.Sprintf("%s", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXIssuerKey]))
+		assert.Equal(t, fmt.Sprintf("%s/jwks", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXJwksUriKey]))
+		assert.Equal(t, fmt.Sprintf("%s/token", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXTokenEndpointKey]))
 	})
 
 	// existing, in-use secret should be preserved
-	sec, err = getSecret(ctx, cli, namespace, alreadyInUseSecret)
+	previousSecret, err := getSecret(ctx, cli, namespace, alreadyInUseSecret)
 	assert.NoError(t, err)
-	assert.NotNil(t, sec)
+	assert.NotNil(t, previousSecret)
 
 	// expired secret should be deleted
-	sec, err = getSecret(ctx, cli, namespace, expiredSecret)
+	_, err = getSecret(ctx, cli, namespace, expiredSecret)
 	assert.True(t, errors.IsNotFound(err), "expired secret should be deleted")
 
 	// retrieve the jwker resource and check that hash and status is set
-	jwk := &nais_io_v1.Jwker{
-		TypeMeta: v1.TypeMeta{
-			Kind:       "Jwker",
-			APIVersion: "v1",
-		},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      appName,
-			Namespace: namespace,
-		},
-	}
+	jwker := &naisiov1.Jwker{}
 	key := client.ObjectKey{
 		Namespace: namespace,
 		Name:      appName,
 	}
-	err = cli.Get(ctx, key, jwk)
+	err = cli.Get(ctx, key, jwker)
 	assert.NoError(t, err)
 
-	hash, err := jwk.Spec.Hash()
+	assert.True(t, containsOwnerRef(currentSecret.GetOwnerReferences(), jwker), "secret should contain ownerReference")
+
+	hash, err := jwker.Spec.Hash()
 	assert.NoError(t, err)
-	assert.Equal(t, hash, jwk.Status.SynchronizationHash)
-	assert.Equal(t, events.RolloutComplete, jwk.Status.SynchronizationState)
+	assert.Equal(t, hash, jwker.Status.SynchronizationHash)
+	assert.Equal(t, events.RolloutComplete, jwker.Status.SynchronizationState)
 
 	// remove the jwker resource; usually done when naiserator syncs
-	err = cli.Delete(ctx, jwk)
+	err = cli.Delete(ctx, jwker)
 	assert.NoError(t, err)
 
 	// test that deleting the jwker resource purges associated secrets
@@ -387,4 +374,23 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 			tokendings.NewInstance(tokendingsURL, "jwker", &jwk),
 		},
 	}, nil
+}
+
+func containsOwnerRef(refs []metav1.OwnerReference, owner *naisiov1.Jwker) bool {
+	expected := metav1.OwnerReference{
+		APIVersion: owner.APIVersion,
+		Kind:       owner.Kind,
+		Name:       owner.Name,
+		UID:        owner.UID,
+	}
+	for _, ref := range refs {
+		sameApiVersion := ref.APIVersion == expected.APIVersion
+		sameKind := ref.Kind == expected.Kind
+		sameName := ref.Name == expected.Name
+		sameUID := ref.UID == expected.UID
+		if sameApiVersion && sameKind && sameName && sameUID {
+			return true
+		}
+	}
+	return false
 }
