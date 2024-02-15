@@ -16,9 +16,6 @@ import (
 )
 
 const (
-	OldJwksKey = "jwks"
-	OldJwkKey  = "jwk"
-
 	TokenXClientIdKey      = "TOKEN_X_CLIENT_ID"
 	TokenXIssuerKey        = "TOKEN_X_ISSUER"
 	TokenXJwksUriKey       = "TOKEN_X_JWKS_URI"
@@ -48,9 +45,8 @@ func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 	jwk := &jose.JSONWebKey{}
 
 	jwkBytes, found := sec.Data[TokenXPrivateJwkKey]
-
 	if !found {
-		return extractOldJwk(sec)
+		return nil, errors.New(fmt.Sprintf("failed to find any expected keys in secret '%s'", sec.Name))
 	}
 
 	if err := json.Unmarshal(jwkBytes, jwk); err != nil {
@@ -60,35 +56,10 @@ func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 	return jwk, nil
 }
 
-// temporary func to handle renaming/changes to expected jwker secret
-func extractOldJwk(sec corev1.Secret) (*jose.JSONWebKey, error) {
-	jwks := &jose.JSONWebKeySet{}
-	oldJwksBytes, found := sec.Data[OldJwksKey]
-
-	if found {
-		if err := json.Unmarshal(oldJwksBytes, jwks); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal '%s' from secret '%s': %w", OldJwksKey, sec.Name, err)
-		}
-		return FirstJWK(*jwks)
-	}
-
-	jwk := &jose.JSONWebKey{}
-	oldJwkBytes, found := sec.Data[OldJwkKey]
-
-	if found {
-		if err := json.Unmarshal(oldJwkBytes, jwk); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal '%s' from secret '%s': %w", OldJwkKey, sec.Name, err)
-		}
-		return jwk, nil
-	}
-
-	return nil, errors.New(fmt.Sprintf("failed to find any expected keys in secret '%s'", sec.Name))
-}
-
 func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, error) {
-	stringdata, err := stringData(data)
+	jwkJson, err := json.Marshal(data.Jwk)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal private JWK: %w", err)
 	}
 
 	return &corev1.Secret{
@@ -99,10 +70,20 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: data.ClientId.Namespace,
-			Labels:    map[string]string{"app": data.ClientId.Name, TokenXSecretLabelKey: TokenXSecretLabelType},
+			Labels: map[string]string{
+				"app":                data.ClientId.Name,
+				TokenXSecretLabelKey: TokenXSecretLabelType,
+			},
 		},
-		StringData: stringdata,
-		Type:       "Opaque",
+		StringData: map[string]string{
+			TokenXPrivateJwkKey:    string(jwkJson),
+			TokenXClientIdKey:      data.ClientId.String(),
+			TokenXWellKnownUrlKey:  data.TokendingsConfig.WellKnownURL,
+			TokenXIssuerKey:        data.TokendingsConfig.Metadata.Issuer,
+			TokenXJwksUriKey:       data.TokendingsConfig.Metadata.JwksURI,
+			TokenXTokenEndpointKey: data.TokendingsConfig.Metadata.TokenEndpoint,
+		},
+		Type: corev1.SecretTypeOpaque,
 	}, nil
 }
 
@@ -131,19 +112,4 @@ func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Cli
 		return secrets, err
 	}
 	return secrets, nil
-}
-
-func stringData(data PodSecretData) (map[string]string, error) {
-	jwkJson, err := json.Marshal(data.Jwk)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal private JWK: %w", err)
-	}
-	return map[string]string{
-		TokenXPrivateJwkKey:    string(jwkJson),
-		TokenXClientIdKey:      data.ClientId.String(),
-		TokenXWellKnownUrlKey:  data.TokendingsConfig.WellKnownURL,
-		TokenXIssuerKey:        data.TokendingsConfig.Metadata.Issuer,
-		TokenXJwksUriKey:       data.TokendingsConfig.Metadata.JwksURI,
-		TokenXTokenEndpointKey: data.TokendingsConfig.Metadata.TokenEndpoint,
-	}, nil
 }
