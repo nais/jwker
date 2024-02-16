@@ -25,6 +25,8 @@ const (
 
 	TokenXSecretLabelKey  = "type"
 	TokenXSecretLabelType = "jwker.nais.io"
+
+	StakaterReloaderAnnotationKey = "reloader.stakater.com/match"
 )
 
 type PodSecretData struct {
@@ -73,6 +75,9 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 			Labels: map[string]string{
 				"app":                data.ClientId.Name,
 				TokenXSecretLabelKey: TokenXSecretLabelType,
+			},
+			Annotations: map[string]string{
+				StakaterReloaderAnnotationKey: "true",
 			},
 		},
 		StringData: map[string]string{

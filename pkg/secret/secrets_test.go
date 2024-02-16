@@ -81,6 +81,18 @@ func TestCreateSecretSpec(t *testing.T) {
 		assert.Equal(t, "https://tokendings.example.com/jwks", actual.StringData[TokenXJwksUriKey])
 		assert.Equal(t, "https://tokendings.example.com/token", actual.StringData[TokenXTokenEndpointKey])
 	})
+
+	t.Run("should contain expected metadata", func(t *testing.T) {
+		expectedLabels := map[string]string{
+			"app":                app.Name,
+			TokenXSecretLabelKey: TokenXSecretLabelType,
+		}
+		expectedAnnotations := map[string]string{
+			StakaterReloaderAnnotationKey: "true",
+		}
+		assert.Equal(t, expectedLabels, actual.GetLabels())
+		assert.Equal(t, expectedAnnotations, actual.GetAnnotations())
+	})
 }
 
 func JsonAsString(v interface{}) string {
