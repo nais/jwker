@@ -17,7 +17,7 @@ jobs:
         with:
           go-version: '1.22'
           check-latest: true
-      - uses: actions/cache@ab5e6d0c87105b4c9c2047343972218f562e4319 # ratchet:actions/cache@v3
+      - uses: actions/cache@e12d46a63a90f2fae62d114769bbf2a179198b5c # ratchet:actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
       - name: Install cosign
-        uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # ratchet:sigstore/cosign-installer@main
+        uses: sigstore/cosign-installer@162dfdf7b9ab8be88c95b4fc982792c4c273e27a # ratchet:sigstore/cosign-installer@main
         with:
           cosign-release: 'v2.1.1'
       - name: Verify runner image
