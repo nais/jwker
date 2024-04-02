@@ -50,7 +50,7 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@162dfdf7b9ab8be88c95b4fc982792c4c273e27a # ratchet:sigstore/cosign-installer@main
         with:
-          cosign-release: 'v2.1.1'
+          cosign-release: 'v2.2.3'
       - name: Verify runner image
         run: cosign verify --certificate-identity ${{ env.BASEIMG_IDENTITY }} --certificate-oidc-issuer ${{ env.BASEIMG_ISSUER }} ${{ env.RUNNER_IMG }}
       - uses: nais/platform-build-push-sign@main # ratchet:exclude
