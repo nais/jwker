@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/nais/jwker/jwkutils"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 type TokenResponse struct {
@@ -108,7 +109,7 @@ func ClientAssertion(privateJwk *jose.JSONWebKey, clientID string, endpoint stri
 	claims := Claims(clientID, endpoint)
 
 	builder := jwt.Signed(rsaSigner).Claims(claims)
-	rawJWT, err := builder.CompactSerialize()
+	rawJWT, err := builder.Serialize()
 	if err != nil {
 		return "", err
 	}

@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
+	flag "github.com/spf13/pflag"
+
 	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/tokendings"
-	flag "github.com/spf13/pflag"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 var cfg config
@@ -135,7 +136,7 @@ func applicationToken(params newTokenParams) (*tokendings.TokenResponse, error) 
 		ID:        jwkutils.RandStringBytes(8),
 	}
 	builder = builder.Claims(claims)
-	rawJWT, err := builder.CompactSerialize()
+	rawJWT, err := builder.Serialize()
 	if err != nil {
 		return nil, err
 	}

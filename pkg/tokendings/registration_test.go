@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/nais/jwker/jwkutils"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -188,7 +188,7 @@ func TestMakeClientRegistration(t *testing.T) {
 
 func verifyToken(t *testing.T, r *http.Request, jwk jose.JSONWebKey) {
 	raw := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-	sign, err := jose.ParseSigned(raw)
+	sign, err := jose.ParseSignedCompact(raw, []jose.SignatureAlgorithm{jose.RS256})
 	payload, err := sign.Verify(jwk.Public())
 	assert.NoError(t, err)
 

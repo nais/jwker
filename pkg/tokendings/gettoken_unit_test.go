@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/tokendings"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 )
 
 type handler struct {
@@ -26,7 +27,8 @@ func (h *handler) serveToken(w http.ResponseWriter, r *http.Request) {
 	scope := r.Form.Get("scope")
 	assert.Equal(h.t, "tokendings", scope)
 
-	sign, err := jose.ParseSigned(r.Form.Get("client_assertion"))
+	assertion := r.Form.Get("client_assertion")
+	sign, err := jose.ParseSignedCompact(assertion, []jose.SignatureAlgorithm{jose.RS256})
 	payload, err := sign.Verify(h.jwk.Public())
 	assert.NoError(h.t, err)
 

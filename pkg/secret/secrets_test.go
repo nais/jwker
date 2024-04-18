@@ -6,13 +6,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/nais/jwker/jwkutils"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/tokendings"
 )

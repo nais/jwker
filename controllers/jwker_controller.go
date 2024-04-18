@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
-	"gopkg.in/square/go-jose.v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"

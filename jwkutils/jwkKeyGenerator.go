@@ -5,9 +5,8 @@ import (
 	"crypto/rsa"
 	"math/rand"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/google/uuid"
-
-	"gopkg.in/square/go-jose.v2"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

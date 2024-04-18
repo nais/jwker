@@ -9,9 +9,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 
 	"github.com/nais/jwker/pkg/tokendings"
 )

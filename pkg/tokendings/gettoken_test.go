@@ -2,10 +2,12 @@ package tokendings
 
 import (
 	"encoding/json"
-	"github.com/nais/jwker/jwkutils"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 	"testing"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/nais/jwker/jwkutils"
 )
 
 func TestClientAssertion(t *testing.T) {
@@ -15,7 +17,7 @@ func TestClientAssertion(t *testing.T) {
 	raw, err := ClientAssertion(&jwk, "client1", "http://endpoint/registration/client")
 	assert.NoError(t, err)
 
-	sign, err := jose.ParseSigned(raw)
+	sign, err := jose.ParseSignedCompact(raw, []jose.SignatureAlgorithm{jose.RS256})
 	payload, err := sign.Verify(jwk.Public())
 	assert.NoError(t, err)
 

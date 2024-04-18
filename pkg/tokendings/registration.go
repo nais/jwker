@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
-	"github.com/nais/liberator/pkg/oauth"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
+	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/oauth"
 )
 
 type ClientId struct {
@@ -118,7 +119,7 @@ func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *
 	}
 	builder = builder.Claims(softwareStatement)
 
-	rawJWT, err := builder.CompactSerialize()
+	rawJWT, err := builder.Serialize()
 	if err != nil {
 		return nil, err
 	}

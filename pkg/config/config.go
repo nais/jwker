@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/nais/liberator/pkg/oauth"
-	"gopkg.in/square/go-jose.v2"
 
 	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/tokendings"
