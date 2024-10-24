@@ -103,7 +103,7 @@ func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientId) error
 
 func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, appClientId ClientId, jwker v1.Jwker) (*ClientRegistration, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: jwkerPrivateJwk.Key}
-	var signerOpts = jose.SignerOptions{}
+	signerOpts := jose.SignerOptions{}
 	signerOpts.WithType("JWT")
 	signerOpts.WithHeader("kid", jwkerPrivateJwk.KeyID)
 

@@ -1,0 +1,39 @@
+{{ if .Values.jwker.enabled }}
+apiVersion: nais.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ include "tokenx.fullname" . }}-jwker
+  labels:
+    {{- include "tokenx.jwker.labels" . | nindent 4 }}
+    team: {{ .Values.team }}
+spec:
+  resources:
+    {{- toYaml .Values.jwker.resources | nindent 4 }}
+  image: "{{ .Values.repository }}/{{ .Values.jwker.image}}:{{ .Values.jwker.tag}}"
+  port: 8181
+  strategy:
+    type: Recreate
+  liveness:
+    path: /metrics
+  readiness:
+    path: /metrics
+  replicas:
+    min: 1
+    max: 1
+  prometheus:
+    enabled: true
+    path: /metrics
+  envFrom:
+    - secret: jwker-env
+  accessPolicy:
+    outbound:
+      external:
+        - host: "{{- include "tokenx.tokendings.URL" . | trimPrefix "https://"}}"
+        {{- $instances := split "," .Values.jwker.secrets.env.TOKENDINGS_INSTANCES }}
+        {{- range $instances }}
+        {{- if ne . ""}}
+        - host: "{{ . | trimPrefix "https://"}}"
+        {{- end }}
+        {{- end }}
+  skipCaBundle: true
+{{ end }}
