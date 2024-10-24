@@ -1,0 +1,57 @@
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    {{- include "tokenx.jwker.labels" . | nindent 4 }}
+  name: {{ include "tokenx.fullname" . }}-jwker
+rules:
+  - apiGroups:
+      - nais.io
+    resources:
+      - jwkers
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - delete
+      - update
+  - apiGroups:
+      - '*'
+    resources:
+      - secrets
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - delete
+      - update
+  - apiGroups:
+      - '*'
+    resources:
+      - pods
+      - namespaces
+    verbs:
+      - list
+      - get
+      - watch
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    {{- include "tokenx.jwker.labels" . | nindent 4 }}
+  name: {{ include "tokenx.fullname" . }}-jwker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "tokenx.fullname" . }}-jwker
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "tokenx.fullname" . }}-jwker
+    namespace: "{{ .Release.Namespace }}"
+---

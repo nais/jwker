@@ -3,7 +3,6 @@ package secret
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/go-jose/go-jose/v4"
@@ -48,7 +47,7 @@ func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 
 	jwkBytes, found := sec.Data[TokenXPrivateJwkKey]
 	if !found {
-		return nil, errors.New(fmt.Sprintf("failed to find any expected keys in secret '%s'", sec.Name))
+		return nil, fmt.Errorf("failed to find any expected keys in secret '%s'", sec.Name)
 	}
 
 	if err := json.Unmarshal(jwkBytes, jwk); err != nil {
@@ -109,7 +108,7 @@ func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings
 
 func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Client) (corev1.SecretList, error) {
 	var secrets corev1.SecretList
-	var mLabels = client.MatchingLabels{}
+	mLabels := client.MatchingLabels{}
 
 	mLabels["app"] = app.Name
 	mLabels[TokenXSecretLabelKey] = TokenXSecretLabelType

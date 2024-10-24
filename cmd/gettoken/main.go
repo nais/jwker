@@ -44,7 +44,6 @@ func main() {
 	bdec := base64.NewDecoder(base64.StdEncoding, file)
 	jdec := json.NewDecoder(bdec)
 	err = jdec.Decode(jwks)
-
 	if err != nil {
 		panic(err)
 	}
@@ -113,7 +112,7 @@ type newTokenParams struct {
 func applicationToken(params newTokenParams) (*tokendings.TokenResponse, error) {
 	token := &tokendings.TokenResponse{}
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: params.privateJwk.Key}
-	var signerOpts = jose.SignerOptions{}
+	signerOpts := jose.SignerOptions{}
 	signerOpts.WithType("JWT")
 	signerOpts.WithHeader("kid", params.privateJwk.KeyID)
 
