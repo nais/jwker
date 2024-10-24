@@ -18,6 +18,7 @@ func TestClientAssertion(t *testing.T) {
 	assert.NoError(t, err)
 
 	sign, err := jose.ParseSignedCompact(raw, []jose.SignatureAlgorithm{jose.RS256})
+	assert.NoError(t, err)
 	payload, err := sign.Verify(jwk.Public())
 	assert.NoError(t, err)
 

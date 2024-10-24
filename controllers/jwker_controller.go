@@ -137,7 +137,6 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 }
 
 func (r *JwkerReconciler) create(tx transaction) error {
-
 	app := r.appClientID(tx.req)
 
 	cr, err := tokendings.MakeClientRegistration(
@@ -146,7 +145,6 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		app,
 		tx.jwker,
 	)
-
 	if err != nil {
 		return fmt.Errorf("create client registration payload: %s", err)
 	}

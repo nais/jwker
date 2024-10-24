@@ -6,8 +6,26 @@ os                  := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 all: jwker gettoken generateJWK
 
 # Run tests
-test:
+fmt:
+	go run mvdan.cc/gofumpt -w ./
+vet:
+	go vet ./...
+test: fmt vet
 	go test ./... -coverprofile cover.out
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+static:
+	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+deadcode:
+	go run golang.org/x/tools/cmd/deadcode@latest -filter "internal/test/client.go" -filter "internal/test/test.go" -test ./...
+
+helm-lint:
+	helm lint --strict ./charts
+
+check: static deadcode vuln helm-lint
 
 integration_test:
 	go test ./pkg/tokendings/gettoken_test.go -tags=integration -v -count=1

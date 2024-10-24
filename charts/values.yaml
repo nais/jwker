@@ -1,0 +1,32 @@
+repository: europe-north1-docker.pkg.dev/nais-io/nais/images
+
+team: nais
+
+networkPolicy:
+  enabled: false
+  apiServerCIDR:
+
+fullnameOverride: "tokenx"
+nameOverride: "tokenx"
+
+jwker:
+  enabled: true
+  resources:
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+    requests:
+      memory: 256Mi
+      cpu: 200m
+  image: jwker
+  tag: 2024-08-22-143634-d473faf
+  secrets:
+    jwk: ""
+    env:
+      JWKER_PRIVATE_JWK: ""
+      CLUSTER_NAME: ""
+      JWKER_CLIENT_ID: "jwker"
+      LOG_LEVEL: "info"
+      TOKENDINGS_INSTANCES: ""
+  tokendings:
+    host: "tokendings.tokenx"
