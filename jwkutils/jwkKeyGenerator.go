@@ -42,9 +42,10 @@ func GenerateJWK() (jose.JSONWebKey, error) {
 	keyId := uuid.New().String()
 
 	jwk := jose.JSONWebKey{
-		Key:   privateKey,
-		KeyID: keyId,
-		Use:   "sig",
+		Key:       privateKey,
+		KeyID:     keyId,
+		Use:       "sig",
+		Algorithm: "RS256",
 	}
 	return jwk, nil
 }
