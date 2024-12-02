@@ -1,7 +1,7 @@
 apiVersion: v2
-name: jwker
+name: tokenx-jwker
 description: A Helm chart for deploying the JWKer service for TokenX
 type: application
 version: 0.4.5
 sources:
-  - https://github.com/nais/helm-charts/tree/main/features/tokenx
+  - https://github.com/nais/jwker/tree/master/charts
