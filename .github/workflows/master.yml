@@ -32,6 +32,9 @@ jobs:
         with:
           go-version: ${{ needs.go_version.outputs.go_version }}
           cache-dependency-path: ./go.sum
+      - name: Setup Test
+        run: |
+          make kubebuilder
       - name: Check for vulnerable dependencies and static code
         run: make check
       - name: Run tests
