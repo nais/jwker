@@ -17,11 +17,11 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/vuln v1.1.3
 	honnef.co/go/tools v0.5.1
-	k8s.io/api v0.31.1
-	k8s.io/apimachinery v0.31.1
-	k8s.io/client-go v0.31.1
+	k8s.io/api v0.31.3
+	k8s.io/apimachinery v0.31.3
+	k8s.io/client-go v0.31.3
 	mvdan.cc/gofumpt v0.7.0
-	sigs.k8s.io/controller-runtime v0.19.0
+	sigs.k8s.io/controller-runtime v0.19.2
 )
 
 require (
