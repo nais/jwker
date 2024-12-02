@@ -7,7 +7,7 @@ on:
       - '*.md'
       - 'LICENSE.md'
 env:
-  NAME: tokenx-jwker
+  NAME: jwker
   FEATURE_REPOSITORY: oci://europe-north1-docker.pkg.dev/nais-io/nais/feature
   GITHUB_REGISTRY: ghcr.io
 
@@ -63,35 +63,22 @@ jobs:
           push: true
 
       - name: Update values.yaml
-        uses: fjogeleit/yaml-update-action@main
-        with:
-          valueFile: 'charts/values.yaml'
-          propertyPath: 'jwker.image.tag'
-          value: ${{ steps.build-push-sign.outputs.version }}
-          commitChange: false
-
-
-      - name: Update Chart.yaml
-        uses: fjogeleit/yaml-update-action@main
-        with:
-          valueFile: 'charts/Chart.yaml'
-          propertyPath: 'version'
-          value: ${{ steps.build-push-sign.outputs.version }}
-          commitChange: false
+        run: |
+          yq -i '.jwker.tag = ${{ steps.build-push-sign.outputs.version }}' charts/values.yaml
 
       - uses: azure/setup-helm@v4
         name: "Setup Helm"
         with:
-          version: "v3.15.1"
+          version: "v3.16.2"
 
       - name: Build Chart
         run: |-
-          sed -i "s/^version: .*/version: ${{ steps.build-push-sign.outputs.version }}/g" charts/Chart.yaml
+          yq -i '.version = ${{ steps.build-push-sign.outputs.version }}' charts/Chart.yaml
           helm package charts
 
       - name: Push Chart
         run: |-
-          helm push ${{ env.NAME }}*.tgz ${{ env.FEATURE_REPOSITORY }}
+          helm push tokenx-${{ env.NAME }}*.tgz ${{ env.FEATURE_REPOSITORY }}
 
   rollout:
     needs:
@@ -102,5 +89,5 @@ jobs:
     steps:
       - uses: nais/fasit-deploy@v2
         with:
-          chart: ${{ env.FEATURE_REPOSITORY }}/${{ env.NAME }}
+          chart: ${{ env.FEATURE_REPOSITORY }}/tokenx-${{ env.NAME }}
           version: ${{ needs.build_and_push.outputs.version }}
