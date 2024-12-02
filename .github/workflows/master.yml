@@ -65,7 +65,7 @@ jobs:
 
       - name: Update values.yaml
         run: |
-          yq -i '.jwker.tag = ${{ steps.build-push-sign.outputs.version }}' charts/values.yaml
+          yq -i ".jwker.tag = \"${{ steps.build-push-sign.outputs.version }}\"" charts/values.yaml
 
       - uses: azure/setup-helm@v4
         name: "Setup Helm"
@@ -74,7 +74,7 @@ jobs:
 
       - name: Build Chart
         run: |-
-          yq -i '.version = ${{ steps.build-push-sign.outputs.version }}' charts/Chart.yaml
+          yq -i ".version = \"${{ steps.build-push-sign.outputs.version }}\"" charts/Chart.yaml
           helm package charts
 
       - name: Push Chart
