@@ -33,16 +33,20 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-var cli client.Client
-var testEnv *envtest.Environment
-var ctx context.Context
-var cancel context.CancelFunc
+var (
+	cli     client.Client
+	testEnv *envtest.Environment
+	ctx     context.Context
+	cancel  context.CancelFunc
+)
 
-const appName = "app1"
-const secretName = "app1-secret-foobar"
-const alreadyInUseSecret = "already-in-use"
-const expiredSecret = "expired-secret"
-const namespace = "default"
+const (
+	appName            = "app1"
+	secretName         = "app1-secret-foobar"
+	alreadyInUseSecret = "already-in-use"
+	expiredSecret      = "expired-secret"
+	namespace          = "default"
+)
 
 type tokendingsHandler struct{}
 
@@ -258,7 +262,7 @@ func TestReconciler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "local:default:app1", string(currentSecret.Data[secret.TokenXClientIdKey]))
 		assert.Equal(t, fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXWellKnownUrlKey]))
-		assert.Equal(t, fmt.Sprintf("%s", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXIssuerKey]))
+		assert.Equal(t, tokendingsServer.URL, string(currentSecret.Data[secret.TokenXIssuerKey]))
 		assert.Equal(t, fmt.Sprintf("%s/jwks", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXJwksUriKey]))
 		assert.Equal(t, fmt.Sprintf("%s/token", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXTokenEndpointKey]))
 	})

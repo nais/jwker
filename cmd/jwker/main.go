@@ -76,7 +76,6 @@ func main() {
 			BindAddress: cfg.MetricsAddr,
 		},
 	})
-
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)

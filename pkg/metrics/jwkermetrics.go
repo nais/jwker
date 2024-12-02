@@ -45,7 +45,7 @@ func RefreshTotalJwkerClusterMetrics(cli client.Client) error {
 	exp := 10 * time.Second
 
 	var secretList v1.SecretList
-	var mLabels = client.MatchingLabels{}
+	mLabels := client.MatchingLabels{}
 	mLabels["type"] = secret.TokenXSecretLabelType
 	var jwkerList jwkerv1.JwkerList
 

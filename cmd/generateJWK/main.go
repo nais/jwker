@@ -20,5 +20,5 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Copy the following to the path you provide in 'azureJWKFile':")
-	fmt.Printf(string(json))
+	fmt.Print(string(json))
 }

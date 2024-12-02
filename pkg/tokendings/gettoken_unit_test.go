@@ -21,7 +21,6 @@ type handler struct {
 }
 
 func (h *handler) serveToken(w http.ResponseWriter, r *http.Request) {
-
 	err := r.ParseForm()
 	assert.NoError(h.t, err)
 	scope := r.Form.Get("scope")
@@ -29,6 +28,7 @@ func (h *handler) serveToken(w http.ResponseWriter, r *http.Request) {
 
 	assertion := r.Form.Get("client_assertion")
 	sign, err := jose.ParseSignedCompact(assertion, []jose.SignatureAlgorithm{jose.RS256})
+	assert.NoError(h.t, err)
 	payload, err := sign.Verify(h.jwk.Public())
 	assert.NoError(h.t, err)
 
@@ -55,6 +55,7 @@ func TestGetTokenLocally(t *testing.T) {
 	clientid := "jwker-client-id"
 	scope := "tokendings"
 	jwk, err := jwkutils.GenerateJWK()
+	assert.NoError(t, err)
 
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	endpoint := "http://" + listener.Addr().String()
