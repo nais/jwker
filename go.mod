@@ -6,13 +6,13 @@ require (
 	github.com/go-jose/go-jose/v4 v4.0.4
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/zapr v1.3.0
-	github.com/golang-jwt/jwt/v4 v4.5.0
+	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/uuid v1.6.0
-	github.com/nais/liberator v0.0.0-20241016090233-9652864f12fa
+	github.com/nais/liberator v0.0.0-20241202085706-4ad01196294d
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/vektra/mockery/v2 v2.49.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/vuln v1.1.3
