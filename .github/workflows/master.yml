@@ -47,6 +47,7 @@ jobs:
       - tests
     permissions:
       contents: "read"
+      packages: "write"
       id-token: "write"
     name: build and push
     runs-on: ubuntu-latest
