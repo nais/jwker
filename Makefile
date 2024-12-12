@@ -1,5 +1,5 @@
-KUBEBUILDER_VERSION := 3.9.0
-K8S_VERSION         := 1.26.1
+KUBEBUILDER_VERSION := 4.3.1
+K8S_VERSION         := 1.31.0
 arch                := amd64
 os                  := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 
