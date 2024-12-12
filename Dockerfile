@@ -4,10 +4,6 @@ FROM golang:1.23 AS builder
 COPY . /workspace
 WORKDIR /workspace
 
-# download kubebuilder
-RUN mkdir -p /usr/local/kubebuilder
-RUN make kubebuilder
-
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
