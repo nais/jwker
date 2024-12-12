@@ -45,7 +45,7 @@ func init() {
 
 	level, err := log.ParseLevel(strings.ToLower(os.Getenv("LOG_LEVEL")))
 	if err != nil {
-		log.SetLevel(log.InfoLevel)
+		level = log.InfoLevel
 	}
 
 	log.SetLevel(level)
