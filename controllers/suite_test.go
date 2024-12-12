@@ -418,7 +418,7 @@ func getFirstFoundEnvTestBinaryDir() string {
 	basePath := filepath.Join("..", "bin", "k8s")
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		logrus.WithError(err).WithField("path", basePath).Errorf("Failed to read directory")
+		logrus.WithError(err).WithField("path", basePath).Errorf("Failed to read directory; have you run 'make setup-envtest'?")
 		return ""
 	}
 	for _, entry := range entries {
