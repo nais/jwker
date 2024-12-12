@@ -7,7 +7,6 @@ on:
 env:
   NAME: jwker
   FEATURE_REPOSITORY: oci://europe-north1-docker.pkg.dev/nais-io/nais/feature
-  GITHUB_REGISTRY: ghcr.io
 
 jobs:
   go_version:
