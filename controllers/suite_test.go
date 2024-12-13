@@ -262,6 +262,14 @@ func TestReconciler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, currentSecret)
 
+	assert.Equal(t, map[string]string{
+		secret.StakaterReloaderAnnotationKey: "true",
+	}, currentSecret.GetAnnotations())
+	assert.Equal(t, map[string]string{
+		"app":                       appName,
+		secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
+	}, currentSecret.GetLabels())
+
 	// secret must have data
 	assert.NotEmpty(t, currentSecret.Data[secret.TokenXPrivateJwkKey])
 
@@ -399,7 +407,9 @@ func containsOwnerRef(refs []metav1.OwnerReference, owner *naisiov1.Jwker) bool 
 		sameKind := ref.Kind == expected.Kind
 		sameName := ref.Name == expected.Name
 		sameUID := ref.UID == expected.UID
-		if sameApiVersion && sameKind && sameName && sameUID {
+		isBlockOwnerDeletion := ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion == true
+		isController := ref.Controller != nil && *ref.Controller == true
+		if sameApiVersion && sameKind && sameName && sameUID && isBlockOwnerDeletion && isController {
 			return true
 		}
 	}

@@ -12,7 +12,9 @@ import (
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -166,6 +168,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		return fmt.Errorf("unable to get first jwk from jwks: %s", err)
 	}
 
+	secretName := tx.jwker.Spec.SecretName
 	secretData := secret.PodSecretData{
 		ClientId: app,
 		Jwk:      *jwk,
@@ -175,24 +178,27 @@ func (r *JwkerReconciler) create(tx transaction) error {
 			WellKnownURL: instances[0].WellKnownURL,
 		},
 	}
-
-	secretSpec, err := secret.CreateSecretSpec(tx.jwker.Spec.SecretName, secretData)
+	secretSpec, err := secret.CreateSecretSpec(secretName, secretData)
 	if err != nil {
 		return fmt.Errorf("creating secret spec: %w", err)
 	}
 
-	err = controllerutil.SetOwnerReference(&tx.jwker, secretSpec, r.Scheme)
+	target := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name:      secretName,
+		Namespace: tx.req.Namespace,
+	}}
+	res, err := controllerutil.CreateOrUpdate(tx.ctx, r.Client, target, func() error {
+		target.SetAnnotations(secretSpec.GetAnnotations())
+		target.SetLabels(secretSpec.GetLabels())
+		target.StringData = secretSpec.StringData
+
+		return ctrl.SetControllerReference(&tx.jwker, target, r.Scheme)
+	})
 	if err != nil {
-		return fmt.Errorf("setting owner reference: %w", err)
+		return fmt.Errorf("creating or updating secret %s: %w", secretName, err)
 	}
 
-	err = r.Client.Create(tx.ctx, secretSpec)
-	if errors.IsAlreadyExists(err) {
-		err = r.Client.Update(tx.ctx, secretSpec)
-	}
-	if err != nil {
-		return fmt.Errorf("apply secret: %w", err)
-	}
+	r.logger.Info(fmt.Sprintf("Secret '%s' %s", secretName, res))
 
 	return nil
 }
