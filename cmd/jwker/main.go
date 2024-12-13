@@ -34,6 +34,7 @@ func init() {
 	metrics.Registry.MustRegister(
 		jwkermetrics.JwkersTotal,
 		jwkermetrics.JwkersProcessedCount,
+		jwkermetrics.JwkersFinalizedCount,
 		jwkermetrics.JwkerSecretsTotal,
 		jwkermetrics.JwkersProcessingFailedCount,
 	)

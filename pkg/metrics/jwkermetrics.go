@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	// metrics
 	JwkersTotal = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "jwker_total",
@@ -22,6 +21,12 @@ var (
 		prometheus.CounterOpts{
 			Name: "jwker_processed_count",
 			Help: "Number of jwkers processed",
+		},
+	)
+	JwkersFinalizedCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "jwker_finalized_count",
+			Help: "Number of jwkers finalized",
 		},
 	)
 	JwkerSecretsTotal = prometheus.NewGauge(

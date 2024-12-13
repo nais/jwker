@@ -13,7 +13,6 @@ import (
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -31,6 +30,7 @@ import (
 )
 
 const (
+	finalizer       = "jwker.nais.io/finalizer"
 	requeueInterval = 10 * time.Second
 )
 
@@ -53,27 +53,29 @@ func (r *JwkerReconciler) appClientID(req ctrl.Request) tokendings.ClientId {
 	}
 }
 
-// delete all associated objects
-// TODO: needs finalizer
-func (r *JwkerReconciler) purge(ctx context.Context, req ctrl.Request) error {
-	aid := r.appClientID(req)
+// finalize purges relevant resources from external systems (i.e. the tokendings instances)
+func (r *JwkerReconciler) finalize(ctx context.Context, clientId tokendings.ClientId, jwker *jwkerv1.Jwker) error {
+	if !controllerutil.ContainsFinalizer(jwker, finalizer) {
+		return nil
+	}
 
-	r.logger.Info(fmt.Sprintf("Jwker resource %s in namespace: %s has been deleted. Cleaning up resources", req.Name, req.Namespace))
-
-	r.logger.Info(fmt.Sprintf("Deleting resource %s in namespace %s from %d tokendings instances", req.Name, req.Namespace, len(r.Config.TokendingsInstances)))
 	for _, instance := range r.Config.TokendingsInstances {
-		r.logger.Info(fmt.Sprintf("Deleting client from tokendings instance %s", instance.BaseURL))
-		if err := instance.DeleteClient(ctx, aid); err != nil {
-			return fmt.Errorf("deleting resource from Tokendings instance '%s': %w", instance.BaseURL, err)
+		if err := instance.DeleteClient(ctx, clientId); err != nil {
+			return fmt.Errorf("deleting resource from tokendings at %q: %w", instance.BaseURL, err)
 		}
+		r.logger.Info(fmt.Sprintf("Finalizer: deleted client from tokendings at %q", instance.BaseURL))
 	}
 
-	r.logger.Info(fmt.Sprintf("Deleting application %s jwker secrets in namespace %s from cluster", req.Name, req.Namespace))
-	if err := secret.DeleteClusterSecrets(r.Client, ctx, aid, ""); err != nil {
-		return fmt.Errorf("deleting secrets from cluster: %s", err)
-	}
-	jwkermetrics.JwkerSecretsTotal.Dec()
+	r.logger.Info(fmt.Sprintf("Finalizer: client deleted from %d tokendings instances", len(r.Config.TokendingsInstances)))
 
+	// finally (heh, get it?), remove finalizer from Jwker resource to allow for garbage collection
+	controllerutil.RemoveFinalizer(jwker, finalizer)
+	err := r.Client.Update(ctx, jwker)
+	if err != nil {
+		return fmt.Errorf("removing finalizer: %w", err)
+	}
+
+	jwkermetrics.JwkersFinalizedCount.Inc()
 	return nil
 }
 
@@ -220,24 +222,26 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		"correlation_id", correlationId,
 	)
 
-	// purge other systems if resource was deleted
 	err := r.Get(ctx, req.NamespacedName, &jwker)
-	switch {
-	case errors.IsNotFound(err):
-		err := r.purge(ctx, req)
-		if err == nil {
-			return ctrl.Result{}, nil
-		}
-		r.reportError(err, "failed purge")
-		return ctrl.Result{
-			RequeueAfter: requeueInterval,
-		}, err
+	if err != nil {
+		// we ignore not found errors as cleanup should already be handled by the finalizer
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
-	case err != nil:
-		r.reportError(err, "unable to get jwker resource from cluster")
-		return ctrl.Result{
-			RequeueAfter: requeueInterval,
-		}, nil
+	// object is marked for deletion
+	if !jwker.ObjectMeta.DeletionTimestamp.IsZero() {
+		if err := r.finalize(ctx, r.appClientID(req), &jwker); err != nil {
+			r.reportError(err, "failed purge")
+			return ctrl.Result{}, fmt.Errorf("finalize: %w", err)
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(&jwker, finalizer) {
+		controllerutil.AddFinalizer(&jwker, finalizer)
+		if err := r.Client.Update(ctx, &jwker); err != nil {
+			return ctrl.Result{}, fmt.Errorf("registering finalizer: %w", err)
+		}
 	}
 
 	hash, err = jwker.Spec.Hash()

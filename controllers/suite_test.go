@@ -306,14 +306,14 @@ func TestReconciler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, hash, jwker.Status.SynchronizationHash)
 	assert.Equal(t, events.RolloutComplete, jwker.Status.SynchronizationState)
+	assert.Equal(t, []string{
+		"jwker.nais.io/finalizer",
+	}, jwker.GetFinalizers())
 
 	// remove the jwker resource; usually done when naiserator syncs
 	err = cli.Delete(ctx, jwker)
 	assert.NoError(t, err)
-
-	// test that deleting the jwker resource purges associated secrets
-	assert.NoError(t, waitForDeletedSecret(ctx, cli, namespace, secretName))
-	assert.NoError(t, waitForDeletedSecret(ctx, cli, namespace, alreadyInUseSecret))
+	assert.NoError(t, waitForDeletedJwker(ctx, cli, namespace, jwker.Name))
 
 	cancel()
 	err = testEnv.Stop()
@@ -355,21 +355,21 @@ func getSecretWithTimeout(ctx context.Context, cli client.Client, namespace, nam
 	}
 }
 
-func waitForDeletedSecret(ctx context.Context, cli client.Client, namespace, name string) error {
+func waitForDeletedJwker(ctx context.Context, cli client.Client, namespace, name string) error {
 	key := client.ObjectKey{
 		Namespace: namespace,
 		Name:      name,
 	}
-	sec := &corev1.Secret{}
+	jwker := &naisiov1.Jwker{}
 	timeout := time.NewTimer(5 * time.Second)
 	ticker := time.NewTicker(250 * time.Millisecond)
 
 	for {
 		select {
 		case <-timeout.C:
-			return fmt.Errorf("secret still exists")
+			return fmt.Errorf("jwker still exists")
 		case <-ticker.C:
-			err := cli.Get(ctx, key, sec)
+			err := cli.Get(ctx, key, jwker)
 			if errors.IsNotFound(err) {
 				return nil
 			} else if err != nil {

@@ -91,21 +91,6 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 	}, nil
 }
 
-func DeleteClusterSecrets(cli client.Client, ctx context.Context, app tokendings.ClientId, secretName string) error {
-	secretList, err := ClusterSecrets(ctx, app, cli)
-	if err != nil {
-		return err
-	}
-	for _, clusterSecret := range secretList.Items {
-		if clusterSecret.Name != secretName {
-			if err := cli.Delete(ctx, &clusterSecret); err != nil {
-				return fmt.Errorf("unable to delete clusterSecret: %w", err)
-			}
-		}
-	}
-	return nil
-}
-
 func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Client) (corev1.SecretList, error) {
 	var secrets corev1.SecretList
 	mLabels := client.MatchingLabels{}
