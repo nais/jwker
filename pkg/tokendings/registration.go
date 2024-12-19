@@ -14,6 +14,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/oauth"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ClientId struct {
@@ -28,6 +29,13 @@ func (a *ClientId) String() string {
 
 func (a *ClientId) ToFileName() string {
 	return fmt.Sprintf("%s/%s/%s", a.Cluster, a.Namespace, a.Name)
+}
+
+func (a *ClientId) KubeObjectKey() client.ObjectKey {
+	return client.ObjectKey{
+		Name:      a.Name,
+		Namespace: a.Namespace,
+	}
 }
 
 type ClientRegistration struct {

@@ -25,7 +25,6 @@ import (
 	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
 	jwkermetrics "github.com/nais/jwker/pkg/metrics"
-	"github.com/nais/jwker/pkg/pods"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 )
@@ -91,20 +90,10 @@ type transaction struct {
 func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker jwkerv1.Jwker) (*transaction, error) {
 	app := r.appClientID(req)
 
-	// fetch running pods for this app
-	podList, err := pods.ApplicationPods(ctx, app, r.Client)
+	secrets, err := libernetes.ListSecretsForApplication(ctx, r.Client, app.KubeObjectKey(), secret.Labels(app.Name))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list secrets for app: %w", err)
 	}
-
-	// fetch all jwker managed secrets
-	allSecrets, err := secret.ClusterSecrets(ctx, app, r.Client)
-	if err != nil {
-		return nil, err
-	}
-
-	// find intersect between secrets in use by deployment and all jwker managed secrets
-	secrets := libernetes.ListUsedAndUnusedSecretsForPods(allSecrets, *podList)
 
 	existingJwks := jose.JSONWebKeySet{}
 

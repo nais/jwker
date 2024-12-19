@@ -1,17 +1,14 @@
 package secret
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/go-jose/go-jose/v4"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/tokendings"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -71,10 +68,7 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: data.ClientId.Namespace,
-			Labels: map[string]string{
-				"app":                data.ClientId.Name,
-				TokenXSecretLabelKey: TokenXSecretLabelType,
-			},
+			Labels:    Labels(data.ClientId.Name),
 			Annotations: map[string]string{
 				StakaterReloaderAnnotationKey: "true",
 			},
@@ -91,14 +85,9 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 	}, nil
 }
 
-func ClusterSecrets(ctx context.Context, app tokendings.ClientId, cli client.Client) (corev1.SecretList, error) {
-	var secrets corev1.SecretList
-	mLabels := client.MatchingLabels{}
-
-	mLabels["app"] = app.Name
-	mLabels[TokenXSecretLabelKey] = TokenXSecretLabelType
-	if err := cli.List(ctx, &secrets, client.InNamespace(app.Namespace), mLabels); err != nil {
-		return secrets, err
+func Labels(appName string) map[string]string {
+	return map[string]string{
+		"app":                appName,
+		TokenXSecretLabelKey: TokenXSecretLabelType,
 	}
-	return secrets, nil
 }

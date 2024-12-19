@@ -8,7 +8,7 @@ require (
 	github.com/go-logr/zapr v1.3.0
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/google/uuid v1.6.0
-	github.com/nais/liberator v0.0.0-20241210070031-8875af382632
+	github.com/nais/liberator v0.0.0-20241219121707-182675e6f1ad
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5

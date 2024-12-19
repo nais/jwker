@@ -18,7 +18,7 @@ rules:
       - delete
       - update
   - apiGroups:
-      - '*'
+      - ""
     resources:
       - secrets
       - events
@@ -30,7 +30,7 @@ rules:
       - delete
       - update
   - apiGroups:
-      - '*'
+      - ""
     resources:
       - pods
       - namespaces
@@ -38,7 +38,14 @@ rules:
       - list
       - get
       - watch
-
+  - apiGroups:
+      - apps
+    resources:
+      - replicasets
+    verbs:
+      - list
+      - get
+      - watch
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -54,4 +61,3 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "tokenx.fullname" . }}-jwker
     namespace: "{{ .Release.Namespace }}"
----
