@@ -13,6 +13,7 @@ import (
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -215,6 +216,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	jwkermetrics.JwkersProcessedCount.Inc()
 
+	// FIXME: this is wrong if we enable concurrent reconciles for the controller
 	r.logger = r.Log.WithValues(
 		"jwker", req.NamespacedName,
 		"jwker_name", req.Name,
@@ -299,8 +301,11 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			continue
 		}
 
+		r.logger.Info(fmt.Sprintf("Deleting unused secret '%s'...", oldSecret.GetName()))
 		if err := r.Delete(tx.ctx, &oldSecret); err != nil {
-			r.logger.Error(err, "failed deletion")
+			if !errors.IsNotFound(err) {
+				r.logger.Error(err, "failed deletion")
+			}
 		}
 	}
 
