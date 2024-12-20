@@ -229,10 +229,13 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if !controllerutil.ContainsFinalizer(&jwker, finalizer) {
-		controllerutil.AddFinalizer(&jwker, finalizer)
-		if err := r.Client.Update(ctx, &jwker); err != nil {
+		if err := r.updateJwker(ctx, jwker, func(existing *jwkerv1.Jwker) error {
+			controllerutil.AddFinalizer(existing, finalizer)
+			return r.Update(ctx, existing)
+		}); err != nil {
 			return ctrl.Result{}, fmt.Errorf("registering finalizer: %w", err)
 		}
+		return ctrl.Result{}, nil
 	}
 
 	hash, err = jwker.Spec.Hash()
