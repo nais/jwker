@@ -4,7 +4,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   labels:
     {{- include "tokenx.jwker.labels" . | nindent 4 }}
-  name: {{ include "tokenx.fullname" . }}-jwker
+  name: {{ include "tokenx.jwker.fullname" . }}
 rules:
   - apiGroups:
       - nais.io
@@ -52,12 +52,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   labels:
     {{- include "tokenx.jwker.labels" . | nindent 4 }}
-  name: {{ include "tokenx.fullname" . }}-jwker
+  name: {{ include "tokenx.jwker.fullname" . }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "tokenx.fullname" . }}-jwker
+  name: {{ include "tokenx.jwker.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "tokenx.fullname" . }}-jwker
+    name: {{ include "tokenx.jwker.fullname" . }}
     namespace: "{{ .Release.Namespace }}"

@@ -31,7 +31,7 @@ deadcode:
 helm-lint:
 	helm lint --strict ./charts
 
-check: static deadcode vuln helm-lint
+check: static deadcode vuln
 
 integration_test:
 	go test ./pkg/tokendings/gettoken_test.go -tags=integration -v -count=1

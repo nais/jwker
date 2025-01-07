@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "tokenx.name" -}}
+{{- define "tokenx.jwker.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "tokenx.fullname" -}}
+{{- define "tokenx.jwker.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,7 +26,7 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "tokenx.chart" -}}
+{{- define "tokenx.jwker.chart" -}}
 {{- if .Values.fullnameOverride }}
 {{- printf "%s-%s" .Values.fullnameOverride .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -44,7 +44,7 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "tokenx.jwker.labels" -}}
-helm.sh/chart: {{ include "tokenx.chart" . }}
+helm.sh/chart: {{ include "tokenx.jwker.chart" . }}
 {{ include "tokenx.jwker.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
@@ -56,7 +56,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "tokenx.jwker.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "tokenx.name" . }}-jwker
+app.kubernetes.io/name: {{ include "tokenx.jwker.name" . }}
 {{- if .Values.fullnameOverride }}
 app.kubernetes.io/instance: {{ .Values.fullnameOverride }}
 {{- else }}
@@ -65,22 +65,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Create the name of the service account to use
-*/}}
-{{- define "tokenx.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "tokenx.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
-{{/*
 Tokendings host.
 */}}
 {{- define "tokenx.tokendings.URL" -}}
-{{- if .Values.jwker.tokendings.host }}
-{{- printf "https://%s" .Values.jwker.tokendings.host }}
+{{- if .Values.tokendings.host }}
+{{- printf "https://%s" .Values.tokendings.host }}
 {{- else }}
 {{- fail ".Values.tokendings.host is required." }}
 {{- end }}

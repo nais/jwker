@@ -6,37 +6,35 @@ environmentKinds:
   - onprem
   - legacy
 values:
-  jwker.enabled:
-    description: Enable jwker
-    config:
-      type: bool
-  jwker.secrets.env.CLUSTER_NAME:
-    description: Cluster name
+  clusterName:
     computed:
       template: '"{{ .Env.name }}"'
     config:
       type: string
-  jwker.secrets.env.JWKER_PRIVATE_JWK:
+  privateJwk:
     description: Private JWK used by Jwker to sign client assertions.
     required: true
     config:
       type: string
       secret: true
-  jwker.tag:
+  tag:
     description: Image tag for jwker
     config:
       type: string
-  jwker.secrets.env.LOG_LEVEL:
+  logLevel:
     description: Log level for jwker, default is 'info'
     config:
       type: string
-  jwker.secrets.env.TOKENDINGS_INSTANCES:
-    description: Comma-separated list of Tokendings instances, the first one in the list is the primary instance
+  tokendings.instanceUrls:
+    description: List of URLs for Tokendings instances.
+      Overrides `tokendings.host`.
+      Jwker registers clients with all instances, but configures clients to use the first instance in the list.
     required: false
     config:
-      type: string
-  jwker.tokendings.host:
-    description: Setting this overrides the mapping value (only needed for legacy/onprem environments)
+      type: string_array
+  tokendings.host:
+    description: Host that points to Tokendings.
+      Setting this overrides the mapping value (i.e. `tokenx.<cluster>.<tenant>.cloud.nais.io`)
     required: true
     computed:
       template: '"{{ subdomain . "tokenx" }}"'

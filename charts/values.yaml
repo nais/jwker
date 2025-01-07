@@ -6,27 +6,23 @@ networkPolicy:
   enabled: false
   apiServerCIDR:
 
-fullnameOverride: "tokenx"
-nameOverride: "tokenx"
+fullnameOverride: "tokenx-jwker"
+nameOverride: "tokenx-jwker"
 
-jwker:
-  enabled: true
-  resources:
-    limits:
-      memory: 1Gi
-      cpu: 1000m
-    requests:
-      memory: 256Mi
-      cpu: 200m
-  image: jwker
-  tag: 2024-08-22-143634-d473faf
-  secrets:
-    jwk: ""
-    env:
-      JWKER_PRIVATE_JWK: ""
-      CLUSTER_NAME: ""
-      JWKER_CLIENT_ID: "jwker"
-      LOG_LEVEL: "info"
-      TOKENDINGS_INSTANCES: ""
-  tokendings:
-    host: "tokendings.tokenx"
+resources:
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+  requests:
+    memory: 256Mi
+    cpu: 200m
+
+image: jwker
+tag: 2024-12-20-100942-0fc003f
+
+clusterName: ""
+logLevel: "info"
+privateJwk: ""
+tokendings:
+  host: ""
+  instanceUrls: []
