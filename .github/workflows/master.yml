@@ -62,7 +62,7 @@ jobs:
 
       - name: Update values.yaml
         run: |
-          yq -i ".jwker.tag = \"${{ steps.build-push-sign.outputs.version }}\"" charts/values.yaml
+          yq -i ".tag = \"${{ steps.build-push-sign.outputs.version }}\"" charts/values.yaml
 
       - uses: azure/setup-helm@v4
         name: "Setup Helm"
