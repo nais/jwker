@@ -12,7 +12,7 @@ spec:
             cidr: {{ .Values.networkPolicy.apiServerCIDR | required ".Values.networkPolicy.apiServerCIDR is required." }}
   podSelector:
     matchLabels:
-      app: {{ include "tokenx.jwker.fullname" . }}
+      {{- include "tokenx.jwker.selectorLabels" . | nindent 6 }}
   policyTypes:
     - Egress
 {{ end }}

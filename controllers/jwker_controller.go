@@ -22,9 +22,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
-	jwkermetrics "github.com/nais/jwker/pkg/metrics"
+	"github.com/nais/jwker/pkg/jwk"
+	jwkermetrics "github.com/nais/jwker/pkg/metric"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 )
@@ -82,7 +82,7 @@ func (r *JwkerReconciler) finalize(ctx context.Context, clientId tokendings.Clie
 type transaction struct {
 	ctx         context.Context
 	req         ctrl.Request
-	keyset      jwkutils.KeySet
+	keyset      jwk.KeySet
 	secretLists libernetes.SecretLists
 	jwker       jwkerv1.Jwker
 }
@@ -114,13 +114,13 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 
 	if r.shouldUpdateSecrets(jwker) || newJwk.Key == nil {
 		r.logger.Info("Generating new JWK")
-		newJwk, err = jwkutils.GenerateJWK()
+		newJwk, err = jwk.Generate()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	keyset := jwkutils.KeySetWithExisting(newJwk, existingJwks.Keys)
+	keyset := jwk.KeySetWithExisting(newJwk, existingJwks.Keys)
 
 	return &transaction{
 		ctx:         ctx,

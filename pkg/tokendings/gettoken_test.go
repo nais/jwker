@@ -7,11 +7,11 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nais/jwker/jwkutils"
+	"github.com/nais/jwker/pkg/jwk"
 )
 
 func TestClientAssertion(t *testing.T) {
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
 	raw, err := ClientAssertion(&jwk, "client1", "http://endpoint/registration/client")

@@ -1,0 +1,26 @@
+{{- if .Capabilities.APIVersions.Has "networking.gke.io/v1alpha3" }}
+apiVersion: networking.gke.io/v1alpha3
+kind: FQDNNetworkPolicy
+metadata:
+  labels:
+    {{- include "tokenx.jwker.labels" . | nindent 4 }}
+  name: {{ include "tokenx.jwker.fullname" . }}
+spec:
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - fqdns:
+            - "{{- include "tokenx.tokendings.URL" . | trimPrefix "https://"}}"
+            {{- range .Values.tokendings.instanceUrls }}
+            {{- if ne . ""}}
+            - "{{ . | trimPrefix "https://"}}"
+            {{- end }}
+            {{- end }}
+  podSelector:
+    matchLabels:
+      {{- include "tokenx.jwker.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+{{- end }}

@@ -12,8 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
+	"github.com/nais/jwker/pkg/jwk"
 	"github.com/nais/jwker/pkg/tokendings"
 )
 
@@ -32,7 +32,7 @@ func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
 }
 
 func TestExtractJWK(t *testing.T) {
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
 	secret, err := GetAsSecret(jwk)
@@ -51,7 +51,7 @@ func TestCreateSecretSpec(t *testing.T) {
 		Cluster:   "test",
 	}
 	secretName := "test-secret"
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
 	secretData := PodSecretData{

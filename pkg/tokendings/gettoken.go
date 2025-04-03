@@ -1,30 +1,11 @@
 package tokendings
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/url"
-	"strings"
+	cryptorand "crypto/rand"
 	"time"
-
-	"github.com/nais/jwker/jwkutils"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
-)
-
-type TokenResponse struct {
-	AccessToken     string `json:"access_token"`
-	IssuedTokenType string `json:"issued_token_type"`
-	TokenType       string `json:"token_type"`
-	ExpiresIn       int64  `json:"expires_in"`
-	Scope           string `json:"scope"`
-}
-
-const (
-	grantType           = "client_credentials"
-	clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
 
 type CustomClaims struct {
@@ -46,52 +27,9 @@ func Claims(clientid, audience string) CustomClaims {
 		Subject:   clientid,
 		Expiry:    *exp,
 		NotBefore: 1,
-		ID:        jwkutils.RandStringBytes(8),
+		ID:        cryptorand.Text(),
 		Audience:  audience,
 	}
-}
-
-func OauthForm(scope, clientAssertion string) url.Values {
-	return url.Values{
-		"scope":                 []string{scope},
-		"grant_type":            []string{grantType},
-		"client_assertion_type": []string{clientAssertionType},
-		"client_assertion":      []string{clientAssertion},
-	}
-}
-
-// scope = api://tokendings.prod
-func GetToken(privateJwk *jose.JSONWebKey, clientID string, scope, endpoint string) (*TokenResponse, error) {
-	rawJWT, err := ClientAssertion(privateJwk, clientID, endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	formData := OauthForm(scope, rawJWT)
-
-	request, err := http.NewRequest("POST", endpoint, strings.NewReader(formData.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	client := http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("%s", resp.Status)
-	}
-
-	token := &TokenResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, err
-	}
-
-	return token, nil
 }
 
 func ClientAssertion(privateJwk *jose.JSONWebKey, clientID string, endpoint string) (string, error) {

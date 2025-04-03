@@ -1,30 +1,19 @@
-package jwkutils
+package jwk
 
 import (
 	cryptorand "crypto/rand"
 	"crypto/rsa"
-	"math/rand"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/google/uuid"
 )
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type KeySet struct {
 	Private jose.JSONWebKeySet
 	Public  jose.JSONWebKeySet
 }
 
-func RandStringBytes(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
-
-func ParseJWK(json []byte) (*jose.JSONWebKey, error) {
+func Parse(json []byte) (*jose.JSONWebKey, error) {
 	jwk := &jose.JSONWebKey{}
 	if err := jwk.UnmarshalJSON(json); err != nil {
 		return nil, err
@@ -33,7 +22,7 @@ func ParseJWK(json []byte) (*jose.JSONWebKey, error) {
 	return jwk, nil
 }
 
-func GenerateJWK() (jose.JSONWebKey, error) {
+func Generate() (jose.JSONWebKey, error) {
 	privateKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	if err != nil {
 		return jose.JSONWebKey{}, err

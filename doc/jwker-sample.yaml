@@ -10,9 +10,4 @@ spec:
       - application: app2
         cluster: balls
         namespace: test
-    outbound:
-      rules:
-      - application: app2
-        cluster: balls
-        namespace: test
   secretName: app1

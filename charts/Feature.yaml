@@ -1,10 +1,6 @@
-dependencies:
-  - allOf:
-      - naiserator
 environmentKinds:
   - tenant
   - onprem
-  - legacy
 values:
   clusterName:
     computed:

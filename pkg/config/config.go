@@ -11,7 +11,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/nais/liberator/pkg/oauth"
 
-	"github.com/nais/jwker/jwkutils"
+	"github.com/nais/jwker/pkg/jwk"
 	"github.com/nais/jwker/pkg/tokendings"
 )
 
@@ -46,7 +46,7 @@ func New() (*Config, error) {
 	flag.StringVar(&cfg.LogLevel, "log-level", "info", "Log level for jwker")
 	flag.Parse()
 
-	j, err := jwkutils.ParseJWK([]byte(clientJwkJson))
+	j, err := jwk.Parse([]byte(clientJwkJson))
 	if err != nil {
 		return nil, err
 	}

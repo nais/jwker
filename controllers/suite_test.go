@@ -29,8 +29,8 @@ import (
 	ctrlmetricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/nais/jwker/controllers"
-	"github.com/nais/jwker/jwkutils"
 	"github.com/nais/jwker/pkg/config"
+	"github.com/nais/jwker/pkg/jwk"
 	"github.com/nais/jwker/pkg/secret"
 	"github.com/nais/jwker/pkg/tokendings"
 	// +kubebuilder:scaffold:imports
@@ -140,7 +140,7 @@ func fixtures(cli client.Client) error {
 		return err
 	}
 
-	key, err := jwkutils.GenerateJWK()
+	key, err := jwk.Generate()
 	if err != nil {
 		return err
 	}
@@ -380,7 +380,7 @@ func waitForDeletedJwker(ctx context.Context, cli client.Client, namespace, name
 }
 
 func makeConfig(tokendingsURL string) (*config.Config, error) {
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	if err != nil {
 		return nil, err
 	}

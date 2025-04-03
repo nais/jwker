@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/go-jose/go-jose/v4"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/nais/jwker/jwkutils"
+	"github.com/go-jose/go-jose/v4/jwt"
+	"github.com/nais/jwker/pkg/jwk"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +66,7 @@ var test = clientRegistrationTest{
 }
 
 func TestNewInstance(t *testing.T) {
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 	inst1 := NewInstance("http://localhost:8080", "jwker", &jwk)
 	inst2 := NewInstance("http://localhost:8080/", "jwker", &jwk)
@@ -75,7 +75,7 @@ func TestNewInstance(t *testing.T) {
 }
 
 func TestDeleteClient(t *testing.T) {
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +104,7 @@ func TestRegisterClient(t *testing.T) {
 		Cluster:   "cluster1",
 	}
 
-	jwk, err := jwkutils.GenerateJWK()
+	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,16 +148,16 @@ func TestRegisterClient(t *testing.T) {
 }
 
 func TestMakeClientRegistration(t *testing.T) {
-	signkey, err := jwkutils.GenerateJWK()
+	signkey, err := jwk.Generate()
 	if err != nil {
 		panic(err)
 	}
 
-	appkey, err := jwkutils.GenerateJWK()
+	appkey, err := jwk.Generate()
 	if err != nil {
 		panic(err)
 	}
-	appkeys := jwkutils.KeySetWithExisting(appkey, []jose.JSONWebKey{})
+	appkeys := jwk.KeySetWithExisting(appkey, []jose.JSONWebKey{})
 
 	clientid := ClientId{
 		Name:      "myapplication",
@@ -170,10 +170,16 @@ func TestMakeClientRegistration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, test.clientName, output.ClientName)
 
-	parser := new(jwt.Parser)
-	claims := &jwt.MapClaims{}
-	_, _, err = parser.ParseUnverified(output.SoftwareStatement, claims)
-	assert.NoError(t, err)
+	tok, err := jwt.ParseSigned(output.SoftwareStatement, []jose.SignatureAlgorithm{jose.RS256})
+	if err != nil {
+		panic(err)
+	}
+
+	claims := make(map[string]any)
+	err = tok.UnsafeClaimsWithoutVerification(&claims)
+	if err != nil {
+		panic(err)
+	}
 
 	js, err := json.Marshal(claims)
 	if err != nil {

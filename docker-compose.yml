@@ -1,0 +1,32 @@
+services:
+  oauth-server:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    ports:
+      - "7070:7070"
+    environment:
+      PORT: "7070"
+  tokendings:
+    image: ghcr.io/nais/tokendings:latest
+    ports:
+      - "8080:8080"
+    environment:
+      APPLICATION_PROFILE: "NON_PROD"
+      APPLICATION_PORT: "8080"
+      AUTH_CLIENT_ID: "jwker"
+      AUTH_CLIENT_JWKS: '{"keys":[{"kty":"RSA","e":"AQAB","use":"sig","kid":"BSt_Sm3KNncQlynd9V1PylFRi3H6DXjU3QKoDAUaB0E","alg":"RS256","n":"hDNWiuW8w0cKAG2Ssjujcch8kvpUiAMYJUcBeYXuu4N4vzKx1Jj2VBFkY06SsAb3Z5b9_k-cunkWRYgVc0Sf8_NWfrVCA8SLBgGJUjBxp2ttHJZKLVqHJMIuYr468dUfCr1iHcdumTwhfClv9cTiD4Bl2m5Id_bF23S6RflF0TD6ziLoMXo3SwosX6yN2mCqdy4PoocS8bjV2Fj93UxRN2h7qA4TfBwSx91kBCAzOFFZ84IAgP9u5nwH29q_5_piJHjlAhD6LY8Lc_tXk5rMh_75Z-83EEJlhqPm20jalIYNaigxCFUL_oK-I8IJvpsNH-ECqQs37dWU6dakAyyZrw"}]}'
+      AUTH_ACCEPTED_AUDIENCE: "http://localhost:8080/registration/client"
+      ISSUER_URL: "http://localhost:8080"
+      SUBJECT_TOKEN_ISSUERS: "http://oauth-server:7070/.well-known/openid-configuration"
+      TOKEN_EXPIRY_SECONDS: 900
+      DB_JDBC_URL: "jdbc:postgresql://postgres:5432/tokendings?user=user&password=pwd"
+    depends_on:
+      - postgres
+      - oauth-server
+  postgres:
+    image: "postgres"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pwd
+      POSTGRES_DB: tokendings
+    ports:
+      - "5432:5432"

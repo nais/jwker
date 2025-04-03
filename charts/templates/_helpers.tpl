@@ -50,6 +50,8 @@ helm.sh/chart: {{ include "tokenx.jwker.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+app: {{ include "tokenx.jwker.fullname" . }}
+team: {{ .Values.team }}
 {{- end }}
 
 {{/*

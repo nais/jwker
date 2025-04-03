@@ -9,42 +9,42 @@ $(LOCALBIN):
 
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
-all: jwker gettoken generateJWK
+install-crd:
+	kubectl apply -f https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_jwkers.yaml
 
-# Run tests
+sample:
+	kubectl apply -f ./doc/jwker-sample.yaml
+
 fmt:
-	go run mvdan.cc/gofumpt -w ./
+	go tool gofumpt -w ./
+
 vet:
 	go vet ./...
+
 test: fmt vet
 	go test ./... -coverprofile cover.out
 
 vuln:
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	go tool govulncheck ./...
 
 static:
-	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+	go tool staticcheck ./...
 
 deadcode:
-	go run golang.org/x/tools/cmd/deadcode@latest -filter "internal/test/client.go" -filter "internal/test/test.go" -test ./...
+	go tool deadcode -test ./...
 
 helm-lint:
 	helm lint --strict ./charts
 
 check: static deadcode vuln
 
-integration_test:
-	go test ./pkg/tokendings/gettoken_test.go -tags=integration -v -count=1
-
-# Build manager binary
-jwker:
-	go build -o bin/jwker cmd/jwker/main.go
-
-gettoken:
-	go build -o bin/gettoken cmd/gettoken/main.go
-
-generateJWK:
-	go build -o bin/generateJWK cmd/generateJWK/main.go
+# the JWK is a randomly generated key for testing purposes only
+local: fmt
+	CLUSTER_NAME="local" \
+    JWKER_PRIVATE_JWK='{"p":"u_vEgDmK2pi85XqDTBS7DAeCLHPu-ImWBia9ajKhFF00-zKibzPl8Fib-EmQamZIAhla124d1QzNPS6Gt8WQvx2YocE5CTIAecFqY5bJ_SdNyIlnBjIrfzTL80N5rQRWeObGxllYSVNCWF-Zynwdyg0CZ6EqKG1T01QMEwkEAyk","kty":"RSA","q":"tAiZOAJkbjFuntA-fAdweQg5RR1qZLklD6I_qBhYibwgvvzJ4Vqj7OOOEaMAvyYnzX7RxFPgLWt4GSqvEq8AVnmAyqut5RYv72QSI61qsEGftIrrC6JYgedrwY77QTikEK1WpdULXgdXEAfn3vFCyRy7I4p1Rgxk7ALufzNw6Rc","d":"axB4wjyUx0G9I-OZrqcGE5xe51m9I_n9kBMVaqnBUjODkrUnuBm5RRRgzNxRiCXcMBTk1xT6xTpTgzRWyueE8zjbj_qT4CFIxjBwWhPJt-EUmNZOdLSgRnDMyENv0XLclQITeDKPq6I7LCcS-WPeANfnpSMzpZRBYR4Dza-3j1aFfCsqUB2YUt4AGhCY3RaFmGYHBbqTLYlsBgRXoEVBstVVwrCfAXAr1VwHVpUNLBqYxqc91EL-4bOBx2B5OGLLEKOFMKjAwZ4GrLOfWO5Hvg2XNtBJ2zyybk35p5SaD7x5pNtL2YXaD7VlLfSlDKPjKihHGVg16sd_YFTCQMF4wQ","e":"AQAB","use":"sig","kid":"BSt_Sm3KNncQlynd9V1PylFRi3H6DXjU3QKoDAUaB0E","qi":"PGJcOcXcoFmUj0LUzRvtMGqUDmzoSs88iJtdlDogXVzdOTJA8YYQOH9LiamD9m51jfinNumiALhCKPsFwEKG21jEoy3T0LlWm7gvg3sOeyL2HblP-YHPmGkgauxFVfa2NN6JdpTTd_z8nM_Gu1zHEeAB93xy1y62uqZE3pgK6po","dp":"ESToCe21jTQq3h7rRJALcxBoPdeg7sfVh-AWnE3bxPivMU2v5MZt7RqXtvA2nI2ReaeIUmd3jwuo2DCbFr2M8vEnD3GI2x7VTkVmh4ikCVOBU428eKMwtlxBUYFQ4oenv0UE0egqFh3iyh6F7yKcsOW412yqZJ976qUaqM3EsOk","alg":"RS256","dq":"bqumfI7D7BVJGimLb7UnB8_tXLZTc-14gd7MYOnua2URgDZnZ7fPc00DRYY9bEPpTeK60oR5F5Kr9lSN4N9hRsdUS8IzmNMFzpRmrjXpksYUheiryrAW1mxLimX5wEMwX-weirynSzsZ4wnpGNyYoIaf554yr0fpNkgrElit_Ss","n":"hDNWiuW8w0cKAG2Ssjujcch8kvpUiAMYJUcBeYXuu4N4vzKx1Jj2VBFkY06SsAb3Z5b9_k-cunkWRYgVc0Sf8_NWfrVCA8SLBgGJUjBxp2ttHJZKLVqHJMIuYr468dUfCr1iHcdumTwhfClv9cTiD4Bl2m5Id_bF23S6RflF0TD6ziLoMXo3SwosX6yN2mCqdy4PoocS8bjV2Fj93UxRN2h7qA4TfBwSx91kBCAzOFFZ84IAgP9u5nwH29q_5_piJHjlAhD6LY8Lc_tXk5rMh_75Z-83EEJlhqPm20jalIYNaigxCFUL_oK-I8IJvpsNH-ECqQs37dWU6dakAyyZrw"}' \
+    JWKER_CLIENT_ID="jwker" \
+    TOKENDINGS_URL="http://localhost:8080" \
+    go run cmd/jwker/main.go
 
 ##@ Dependencies
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.

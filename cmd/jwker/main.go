@@ -19,7 +19,7 @@ import (
 
 	"github.com/nais/jwker/controllers"
 	"github.com/nais/jwker/pkg/config"
-	jwkermetrics "github.com/nais/jwker/pkg/metrics"
+	jwkermetrics "github.com/nais/jwker/pkg/metric"
 	// +kubebuilder:scaffold:imports
 )
 
