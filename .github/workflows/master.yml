@@ -26,8 +26,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ needs.go_version.outputs.go_version }}
-          cache-dependency-path: ./go.sum
+          go-version-file: 'go.mod'
       - name: Setup Test
         run: |
           make setup-envtest
