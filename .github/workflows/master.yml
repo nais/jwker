@@ -9,19 +9,8 @@ env:
   FEATURE_REPOSITORY: oci://europe-north1-docker.pkg.dev/nais-io/nais/feature
 
 jobs:
-  go_version:
-    outputs:
-      go_version: ${{ steps.go_version.outputs.GO_VERSION }}
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Find Go version
-        id: go_version
-        run: |
-          echo "GO_VERSION=$(grep golang .tool-versions | awk '{print $2}')" >> $GITHUB_OUTPUT
   test:
     runs-on: ubuntu-latest
-    needs: go_version
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
