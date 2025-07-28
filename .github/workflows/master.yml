@@ -7,13 +7,12 @@ on:
 env:
   NAME: jwker
   FEATURE_REPOSITORY: oci://europe-north1-docker.pkg.dev/nais-io/nais/feature
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # ratchet:actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
       - name: Setup Test
@@ -23,7 +22,6 @@ jobs:
         run: make check
       - name: Run tests
         run: make test
-
   build_and_push:
     if: github.ref == 'refs/heads/master'
     outputs:
@@ -37,9 +35,8 @@ jobs:
     name: build and push
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: nais/platform-build-push-sign@main
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # ratchet:actions/checkout@v4
+      - uses: nais/platform-build-push-sign@main # ratchet:exclude
         id: build-push-sign
         with:
           name: ${{ env.NAME }}
@@ -47,25 +44,20 @@ jobs:
           workload_identity_provider: ${{ secrets.NAIS_IO_WORKLOAD_IDENTITY_PROVIDER }}
           push_ghcr: true
           push: true
-
       - name: Update values.yaml
         run: |
           yq -i ".tag = \"${{ steps.build-push-sign.outputs.version }}\"" charts/values.yaml
-
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # ratchet:azure/setup-helm@v4
         name: "Setup Helm"
         with:
           version: "v3.16.2"
-
       - name: Build Chart
         run: |-
           yq -i ".version = \"${{ steps.build-push-sign.outputs.version }}\"" charts/Chart.yaml
           helm package charts
-
       - name: Push Chart
         run: |-
           helm push tokenx-${{ env.NAME }}*.tgz ${{ env.FEATURE_REPOSITORY }}
-
   rollout:
     needs:
       - build_and_push
@@ -73,7 +65,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: nais/fasit-deploy@v2
+      - uses: nais/fasit-deploy@v2 # ratchet:exclude
         with:
           chart: ${{ env.FEATURE_REPOSITORY }}/tokenx-${{ env.NAME }}
           version: ${{ needs.build_and_push.outputs.version }}
