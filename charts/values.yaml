@@ -3,6 +3,12 @@ image: jwker
 tag: latest
 team: nais
 
+fasit:
+  tenant:
+    name: "unknown"
+  env:
+    name: "unknown"
+
 networkPolicy:
   enabled: false
   apiServerCIDR:

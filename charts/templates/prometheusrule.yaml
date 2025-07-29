@@ -1,0 +1,26 @@
+{{- if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "tokenx.jwker.fullname" . }}
+  labels:
+    {{- include "tokenx.jwker.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: "{{ include "tokenx.jwker.fullname" . }}-alerts"
+      rules:
+        - alert: Jwker reconciles failing
+          expr: sum(rate(jwker_processing_failed_count[2m])) / sum(rate(jwker_processed_count[2m])) > 0.5
+          for: 10m
+          labels:
+            namespace: {{ .Release.Namespace }}
+            severity: warning
+          annotations:
+            summary: {{ include "tokenx.jwker.fullname" . }} has failed to reconcile over 50% of Jwker resources over the last 10 minutes
+            consequence: Applications that have tokenx enabled might not start up as they are dependant on a secret created by Jwker.
+            action: |
+              Check dashboard and logs in `{{"{{ $labels.namespace }}`/`{{ $labels.pod }}"}}`
+              Verify that `tokenx-tokendings` is up and that its ingresses are reachable.
+            dashboard_url: "https://monitoring.nais.io/d/eetdkb54qqmtca/tokenx-jwker?var-tenant={{.Values.fasit.tenant.name }}&var-cluster={{ .Values.fasit.env.name }}"
+{{- end }}
