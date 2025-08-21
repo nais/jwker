@@ -1,6 +1,6 @@
 module github.com/nais/jwker
 
-go 1.24.5
+go 1.25.0
 
 tool (
 	golang.org/x/tools/cmd/deadcode
