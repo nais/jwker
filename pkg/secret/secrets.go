@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-jose/go-jose/v4"
-	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/tokendings"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,9 +25,9 @@ const (
 )
 
 type PodSecretData struct {
-	ClientId         tokendings.ClientId
-	Jwk              jose.JSONWebKey
-	TokendingsConfig config.Tokendings
+	ClientId   tokendings.ClientId
+	Jwk        jose.JSONWebKey
+	Tokendings tokendings.Instance
 }
 
 func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
@@ -57,7 +56,12 @@ func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
 func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, error) {
 	jwkJson, err := json.Marshal(data.Jwk)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal private JWK: %w", err)
+		return nil, fmt.Errorf("marshalling private JWK: %w", err)
+	}
+
+	wellKnownURL, err := data.Tokendings.Metadata.WellKnownURL()
+	if err != nil {
+		return nil, fmt.Errorf("constructing well-known URL: %w", err)
 	}
 
 	return &corev1.Secret{
@@ -76,10 +80,10 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 		StringData: map[string]string{
 			TokenXPrivateJwkKey:    string(jwkJson),
 			TokenXClientIdKey:      data.ClientId.String(),
-			TokenXWellKnownUrlKey:  data.TokendingsConfig.WellKnownURL,
-			TokenXIssuerKey:        data.TokendingsConfig.Metadata.Issuer,
-			TokenXJwksUriKey:       data.TokendingsConfig.Metadata.JwksURI,
-			TokenXTokenEndpointKey: data.TokendingsConfig.Metadata.TokenEndpoint,
+			TokenXWellKnownUrlKey:  wellKnownURL,
+			TokenXIssuerKey:        data.Tokendings.Metadata.Issuer,
+			TokenXJwksUriKey:       data.Tokendings.Metadata.JwksURI,
+			TokenXTokenEndpointKey: data.Tokendings.Metadata.TokenEndpoint,
 		},
 		Type: corev1.SecretTypeOpaque,
 	}, nil

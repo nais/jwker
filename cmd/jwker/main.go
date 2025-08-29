@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"strings"
 	"time"
@@ -58,7 +59,8 @@ func init() {
 }
 
 func main() {
-	cfg, err := config.New()
+	ctx := context.Background()
+	cfg, err := config.New(ctx)
 	if err != nil {
 		log.Fatalf("initializing config: %+v", err)
 	}

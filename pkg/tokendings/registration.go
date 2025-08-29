@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -57,26 +56,19 @@ type SoftwareStatement struct {
 }
 
 type Instance struct {
-	BaseURL      string
-	ClientID     string
-	ClientJwk    *jose.JSONWebKey
-	Metadata     *oauth.MetadataOAuth
-	WellKnownURL string
+	BaseURL   string
+	ClientID  string
+	ClientJwk *jose.JSONWebKey
+	Metadata  *oauth.MetadataOAuth
 }
 
-func NewInstance(baseURL, clientID string, clientJwk *jose.JSONWebKey) *Instance {
-	i := &Instance{
+func NewInstance(baseURL, clientID string, clientJwk *jose.JSONWebKey, metadata *oauth.MetadataOAuth) Instance {
+	return Instance{
 		BaseURL:   baseURL,
 		ClientID:  clientID,
 		ClientJwk: clientJwk,
+		Metadata:  metadata,
 	}
-
-	i.Metadata = &oauth.MetadataOAuth{}
-	i.Metadata.Issuer = i.BaseURL
-	i.Metadata.JwksURI = fmt.Sprintf("%s/jwks", i.BaseURL)
-	i.Metadata.TokenEndpoint = fmt.Sprintf("%s/token", i.BaseURL)
-	i.WellKnownURL = fmt.Sprintf("%s%s", strings.TrimSuffix(i.BaseURL, "/"), oauth.WellKnownOAuthPath)
-	return i
 }
 
 func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientId) error {

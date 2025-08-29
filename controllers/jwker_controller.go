@@ -162,13 +162,9 @@ func (r *JwkerReconciler) create(tx transaction) error {
 
 	secretName := tx.jwker.Spec.SecretName
 	secretData := secret.PodSecretData{
-		ClientId: app,
-		Jwk:      *jwk,
-		TokendingsConfig: config.Tokendings{
-			BaseURL:      instances[0].BaseURL,
-			Metadata:     instances[0].Metadata,
-			WellKnownURL: instances[0].WellKnownURL,
-		},
+		ClientId:   app,
+		Jwk:        *jwk,
+		Tokendings: instances[0],
 	}
 	secretSpec, err := secret.CreateSecretSpec(secretName, secretData)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/nais/jwker/pkg/config"
 	"github.com/nais/jwker/pkg/jwk"
 	"github.com/nais/jwker/pkg/tokendings"
 )
@@ -57,15 +56,13 @@ func TestCreateSecretSpec(t *testing.T) {
 	secretData := PodSecretData{
 		ClientId: app,
 		Jwk:      jwk,
-		TokendingsConfig: config.Tokendings{
+		Tokendings: tokendings.Instance{
+			BaseURL: "https://tokendings.example.com",
 			Metadata: &oauth.MetadataOAuth{
-				MetadataCommon: oauth.MetadataCommon{
-					Issuer:        "https://tokendings.example.com",
-					JwksURI:       "https://tokendings.example.com/jwks",
-					TokenEndpoint: "https://tokendings.example.com/token",
-				},
+				Issuer:        "https://tokendings.example.com",
+				JwksURI:       "https://tokendings.example.com/jwks",
+				TokenEndpoint: "https://tokendings.example.com/token",
 			},
-			WellKnownURL: "https://tokendings.example.com/.well-known/oauth-authorization-server",
 		},
 	}
 	actual, err := CreateSecretSpec(secretName, secretData)

@@ -15,6 +15,7 @@ import (
 	naisiov1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
+	"github.com/nais/liberator/pkg/oauth"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -389,8 +390,12 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 		ClientID:    "jwker",
 		ClientJwk:   &jwk,
 		ClusterName: "local",
-		TokendingsInstances: []*tokendings.Instance{
-			tokendings.NewInstance(tokendingsURL, "jwker", &jwk),
+		TokendingsInstances: []tokendings.Instance{
+			tokendings.NewInstance(tokendingsURL, "jwker", &jwk, &oauth.MetadataOAuth{
+				Issuer:        tokendingsURL,
+				JwksURI:       tokendingsURL + "/jwks",
+				TokenEndpoint: tokendingsURL + "/token",
+			}),
 		},
 	}, nil
 }

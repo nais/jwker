@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/url"
@@ -22,16 +23,10 @@ type Config struct {
 	LogLevel                string
 	MaxConcurrentReconciles int
 	MetricsAddr             string
-	TokendingsInstances     []*tokendings.Instance
+	TokendingsInstances     []tokendings.Instance
 }
 
-type Tokendings struct {
-	BaseURL      string
-	Metadata     *oauth.MetadataOAuth
-	WellKnownURL string
-}
-
-func New() (*Config, error) {
+func New(ctx context.Context) (*Config, error) {
 	cfg := &Config{}
 	var clientJwkJson string
 	var instanceString string
@@ -59,7 +54,7 @@ func New() (*Config, error) {
 		}
 	}
 
-	instances := make([]*tokendings.Instance, 0)
+	instances := make([]tokendings.Instance, 0)
 	raw := strings.TrimSpace(instanceString)
 	if raw == "" {
 		raw = tokendingsURL
@@ -69,7 +64,18 @@ func New() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid base url for tokendings instance: %w", err)
 		}
-		instances = append(instances, tokendings.NewInstance(u, cfg.ClientID, cfg.ClientJwk))
+
+		wellKnownURL, err := oauth.MakeWellKnownURL(u, oauth.WellKnownOAuthSuffix)
+		if err != nil {
+			return nil, fmt.Errorf("constructing well-known URL for tokendings instance %s: %w", u, err)
+		}
+
+		metadata, err := oauth.NewMetadataOAuth(ctx, wellKnownURL)
+		if err != nil {
+			return nil, fmt.Errorf("resolving metadata for tokendings instance %s: %w", u, err)
+		}
+
+		instances = append(instances, tokendings.NewInstance(u, cfg.ClientID, cfg.ClientJwk, metadata))
 	}
 
 	if len(instances) == 0 {

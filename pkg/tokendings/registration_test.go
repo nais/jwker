@@ -14,6 +14,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/nais/jwker/pkg/jwk"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -65,15 +66,6 @@ var test = clientRegistrationTest{
 	softwareStatement: `{"accessPolicyInbound":["mycluster:othernamespace:otherapplication","mycluster:othernamespace:otherapplicationinsamecluster","mycluster:mynamespace:otherapplicationinsamenamespace"],"accessPolicyOutbound":[],"appId":"mycluster:mynamespace:myapplication"}`,
 }
 
-func TestNewInstance(t *testing.T) {
-	jwk, err := jwk.Generate()
-	assert.NoError(t, err)
-	inst1 := NewInstance("http://localhost:8080", "jwker", &jwk)
-	inst2 := NewInstance("http://localhost:8080/", "jwker", &jwk)
-	assert.Equal(t, "http://localhost:8080/.well-known/oauth-authorization-server", inst1.WellKnownURL)
-	assert.Equal(t, "http://localhost:8080/.well-known/oauth-authorization-server", inst2.WellKnownURL)
-}
-
 func TestDeleteClient(t *testing.T) {
 	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
@@ -87,7 +79,7 @@ func TestDeleteClient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	td := NewInstance(server.URL, "jwker", &jwk)
+	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL))
 
 	err = td.DeleteClient(context.Background(), ClientId{
 		Name:      "app1",
@@ -133,7 +125,7 @@ func TestRegisterClient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	td := NewInstance(server.URL, "jwker", &jwk)
+	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL))
 	err = td.RegisterClient(ClientRegistration{
 		ClientName: app.String(),
 		Jwks: jose.JSONWebKeySet{
@@ -206,4 +198,12 @@ func verifyToken(t *testing.T, r *http.Request, jwk jose.JSONWebKey) {
 	aud, err := url.Parse(claims.Audience)
 	assert.NoError(t, err)
 	assert.Equal(t, "/registration/client", aud.Path)
+}
+
+func metadata(baseURL string) *oauth.MetadataOAuth {
+	return &oauth.MetadataOAuth{
+		Issuer:        baseURL,
+		TokenEndpoint: baseURL + "/token",
+		JwksURI:       baseURL + "/jwks",
+	}
 }
