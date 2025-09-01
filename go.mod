@@ -17,7 +17,7 @@ require (
 	github.com/nais/liberator v0.0.0-20250820113517-cc546cd121b0
 	github.com/prometheus/client_golang v1.23.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.34.0
 	k8s.io/apimachinery v0.34.0
