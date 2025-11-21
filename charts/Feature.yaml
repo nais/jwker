@@ -1,3 +1,7 @@
+dependencies:
+  - allOf:
+      - nais-crds
+      # - tokenx-tokendings # This doesn't work for on-premises
 environmentKinds:
   - tenant
   - onprem
