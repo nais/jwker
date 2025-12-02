@@ -39,20 +39,20 @@ func init() {
 
 func main() {
 	ctx := context.Background()
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("logger", "setup")
+
 	cfg, err := config.New(ctx)
 	if err != nil {
-		slog.Error("initializing config", "error", err)
+		log.Error("initializing config", "error", err)
 		os.Exit(1)
 	}
 
 	if err := setupLogger(cfg.LogLevel); err != nil {
-		slog.Error("unable to set up logger", "error", err)
+		log.Error("unable to set up logger", "error", err)
 		os.Exit(1)
 	}
 
-	setupLog := slog.Default().With("logger", "setup")
-	setupLog.Info("starting jwker")
-
+	log.Info("starting jwker")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: ctrlmetricsserver.Options{
@@ -65,17 +65,17 @@ func main() {
 		LeaderElectionID:       "722f3604.nais.io",
 	})
 	if err != nil {
-		setupLog.Error("unable to create manager", "error", err)
+		log.Error("unable to create manager", "error", err)
 		os.Exit(1)
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error("unable to set up health check", "error", err)
+		log.Error("unable to set up health check", "error", err)
 		os.Exit(1)
 	}
 
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error("unable to set up ready check", "error", err)
+		log.Error("unable to set up ready check", "error", err)
 		os.Exit(1)
 	}
 
@@ -86,16 +86,16 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("Jwker"),
 		Scheme:   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error("unable to create controller", "controller", "jwker", "error", err)
+		log.Error("unable to create controller", "controller", "jwker", "error", err)
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting metrics refresh goroutine")
+	log.Info("starting metrics refresh goroutine")
 	go jwkermetrics.RefreshTotalJwkerClusterMetrics(mgr.GetClient())
 
-	setupLog.Info("starting manager")
+	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error("problem running manager", "error", err)
+		log.Error("problem running manager", "error", err)
 		os.Exit(1)
 	}
 }
