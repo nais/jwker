@@ -45,7 +45,7 @@ spec:
               name: probes
               protocol: TCP
             - containerPort: 8181
-              name: metrics
+              name: http
               protocol: TCP
           readinessProbe:
             httpGet:
