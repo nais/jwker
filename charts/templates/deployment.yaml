@@ -14,7 +14,7 @@ spec:
     matchLabels:
       {{- include "tokenx.jwker.selectorLabels" . | nindent 6 }}
   strategy:
-    type: Recreate
+    type: RollingUpdate
   template:
     metadata:
       annotations:
@@ -26,25 +26,31 @@ spec:
       name: {{ include "tokenx.jwker.fullname" . }}
     spec:
       containers:
-        - envFrom:
+        - env:
+            - name: "LEADER_ELECTION"
+              value: "true"
+          envFrom:
             - secretRef:
                 name: {{ .Values.secretName }}
           image: "{{ .Values.repository }}/{{ .Values.image }}:{{ .Values.tag }}"
           imagePullPolicy: IfNotPresent
           livenessProbe:
             httpGet:
-              path: /metrics
-              port: 8181
+              path: /healthz
+              port: 8180
               scheme: HTTP
           name: {{ include "tokenx.jwker.fullname" . }}
           ports:
+            - containerPort: 8180
+              name: probes
+              protocol: TCP
             - containerPort: 8181
-              name: http
+              name: metrics
               protocol: TCP
           readinessProbe:
             httpGet:
-              path: /metrics
-              port: 8181
+              path: /readyz
+              port: 8180
               scheme: HTTP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

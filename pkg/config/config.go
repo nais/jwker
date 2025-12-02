@@ -20,6 +20,8 @@ type Config struct {
 	ClientID                string
 	ClientJwk               *jose.JSONWebKey
 	ClusterName             string
+	ProbeAddr               string
+	LeaderElection          bool
 	LogLevel                string
 	MaxConcurrentReconciles int
 	MetricsAddr             string
@@ -31,14 +33,17 @@ func New(ctx context.Context) (*Config, error) {
 	var clientJwkJson string
 	var instanceString string
 	var tokendingsURL string
+
 	flag.StringVar(&clientJwkJson, "client-jwk-json", os.Getenv("JWKER_PRIVATE_JWK"), "json with private JWK credential")
 	flag.StringVar(&cfg.ClientID, "client-id", os.Getenv("JWKER_CLIENT_ID"), "Client ID of Jwker at Auth Provider.")
 	flag.StringVar(&cfg.ClusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "nais cluster")
+	flag.BoolVar(&cfg.LeaderElection, "leader-election", false, "Enable leader election for controller manager.")
+	flag.StringVar(&cfg.LogLevel, "log-level", "info", "Log level for jwker")
 	flag.IntVar(&cfg.MaxConcurrentReconciles, "max-concurrent-reconciles", 20, "Max concurrent reconciles for controller.")
 	flag.StringVar(&cfg.MetricsAddr, "metrics-addr", ":8181", "The address the metric endpoint binds to.")
+	flag.StringVar(&cfg.ProbeAddr, "probe-addr", ":8180", "The address the health probe listener binds to.")
 	flag.StringVar(&tokendingsURL, "tokendings-base-url", os.Getenv("TOKENDINGS_URL"), "The base URL to Tokendings.")
 	flag.StringVar(&instanceString, "tokendings-instances", os.Getenv("TOKENDINGS_INSTANCES"), "Comma separated list of baseUrls to Tokendings instances.")
-	flag.StringVar(&cfg.LogLevel, "log-level", "info", "Log level for jwker")
 	flag.Parse()
 
 	j, err := jwk.Parse([]byte(clientJwkJson))

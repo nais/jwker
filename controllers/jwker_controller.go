@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
-	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/events"
 	libernetes "github.com/nais/liberator/pkg/kubernetes"
@@ -37,11 +35,9 @@ const (
 // JwkerReconciler reconciles a Jwker object
 type JwkerReconciler struct {
 	client.Client
-	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Reader   client.Reader
 	Recorder record.EventRecorder
-	logger   logr.Logger
 	Config   *config.Config
 }
 
@@ -59,19 +55,17 @@ func (r *JwkerReconciler) finalize(ctx context.Context, clientId tokendings.Clie
 		return nil
 	}
 
+	log := ctrl.LoggerFrom(ctx).WithValues("subsystem", "finalize")
+
 	for _, instance := range r.Config.TokendingsInstances {
 		if err := instance.DeleteClient(ctx, clientId); err != nil {
-			return fmt.Errorf("deleting resource from tokendings at %q: %w", instance.BaseURL, err)
+			return fmt.Errorf("deleting client from Tokendings at %q: %w", instance.BaseURL, err)
 		}
-		r.logger.Info(fmt.Sprintf("Finalizer: deleted client from tokendings at %q", instance.BaseURL))
+		log.Info(fmt.Sprintf("deleted %q from Tokendings at %q", clientId.String(), instance.BaseURL))
 	}
 
-	r.logger.Info(fmt.Sprintf("Finalizer: client deleted from %d tokendings instances", len(r.Config.TokendingsInstances)))
-
-	// finally (heh, get it?), remove finalizer from Jwker resource to allow for garbage collection
 	controllerutil.RemoveFinalizer(jwker, finalizer)
-	err := r.Client.Update(ctx, jwker)
-	if err != nil {
+	if err := r.Client.Update(ctx, jwker); err != nil {
 		return fmt.Errorf("removing finalizer: %w", err)
 	}
 
@@ -89,6 +83,7 @@ type transaction struct {
 
 func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker jwkerv1.Jwker) (*transaction, error) {
 	app := r.appClientID(req)
+	log := ctrl.LoggerFrom(ctx).WithValues("subsystem", "prepare")
 
 	secrets, err := libernetes.ListSecretsForApplication(ctx, r.Client, app.KubeObjectKey(), secret.Labels(app.Name))
 	if err != nil {
@@ -113,7 +108,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 	}
 
 	if r.shouldUpdateSecrets(jwker) || newJwk.Key == nil {
-		r.logger.Info("Generating new JWK")
+		log.Info("generating new JWK")
 		newJwk, err = jwk.Generate()
 		if err != nil {
 			return nil, err
@@ -132,6 +127,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 
 func (r *JwkerReconciler) create(tx transaction) error {
 	app := r.appClientID(tx.req)
+	log := ctrl.LoggerFrom(tx.ctx).WithValues("subsystem", "create")
 
 	cr, err := tokendings.MakeClientRegistration(
 		r.Config.ClientJwk,
@@ -144,18 +140,14 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	}
 
 	instances := r.Config.TokendingsInstances
-	r.logger.Info(fmt.Sprintf("Registering app %s with %d tokendings instances", app.String(), len(instances)))
-
 	for _, instance := range instances {
-		r.logger.Info(fmt.Sprintf("Registering client with tokendings instance %s", instance.BaseURL))
+		log.Info(fmt.Sprintf("registering %q with Tokendings instance at %q", app.String(), instance.BaseURL))
 		if err := instance.RegisterClient(*cr); err != nil {
-			return fmt.Errorf("registering client with Tokendings instance '%s': %w", instance.BaseURL, err)
+			return fmt.Errorf("registering client with Tokendings instance %q: %w", instance.BaseURL, err)
 		}
 	}
 
-	r.logger.Info(fmt.Sprintf("Reconciling secrets for app %s in namespace %s", app.Name, app.Namespace))
-
-	jwk, err := secret.FirstJWK(tx.keyset.Private)
+	j, err := secret.FirstJWK(tx.keyset.Private)
 	if err != nil {
 		return fmt.Errorf("unable to get first jwk from jwks: %s", err)
 	}
@@ -163,7 +155,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 	secretName := tx.jwker.Spec.SecretName
 	secretData := secret.PodSecretData{
 		ClientId:   app,
-		Jwk:        *jwk,
+		Jwk:        *j,
 		Tokendings: instances[0],
 	}
 	secretSpec, err := secret.CreateSecretSpec(secretName, secretData)
@@ -186,8 +178,7 @@ func (r *JwkerReconciler) create(tx transaction) error {
 		return fmt.Errorf("creating or updating secret %s: %w", secretName, err)
 	}
 
-	r.logger.Info(fmt.Sprintf("Secret '%s' %s", secretName, res))
-
+	log.Info(fmt.Sprintf("secret %q %s", secretName, res))
 	return nil
 }
 
@@ -196,19 +187,11 @@ func (r *JwkerReconciler) create(tx transaction) error {
 
 func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	hash := ""
-	correlationId := uuid.New().String()
-	var jwker jwkerv1.Jwker
-
+	log := ctrl.LoggerFrom(ctx).WithName("reconciler")
+	ctx = ctrl.LoggerInto(ctx, log)
 	jwkermetrics.JwkersProcessedCount.Inc()
 
-	// FIXME: this is wrong if we enable concurrent reconciles for the controller
-	r.logger = r.Log.WithValues(
-		"jwker", req.NamespacedName,
-		"jwker_name", req.Name,
-		"jwker_namespace", req.Namespace,
-		"correlation_id", correlationId,
-	)
-
+	var jwker jwkerv1.Jwker
 	err := r.Get(ctx, req.NamespacedName, &jwker)
 	if err != nil {
 		// we ignore not found errors as cleanup should already be handled by the finalizer
@@ -218,7 +201,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// object is marked for deletion
 	if !jwker.ObjectMeta.DeletionTimestamp.IsZero() {
 		if err := r.finalize(ctx, r.appClientID(req), &jwker); err != nil {
-			r.reportError(err, "failed purge")
+			r.reportError(ctx, err, "failed purge")
 			return ctrl.Result{}, fmt.Errorf("finalize: %w", err)
 		}
 		return ctrl.Result{}, nil
@@ -236,7 +219,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	hash, err = jwker.Spec.Hash()
 	if err != nil {
-		r.reportError(err, "failed to calculate hash")
+		r.reportError(ctx, err, "failed to calculate hash")
 		return ctrl.Result{}, err
 	}
 	if jwker.Status.SynchronizationHash == hash {
@@ -255,15 +238,18 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			return r.Update(ctx, existing)
 		})
 		if err != nil {
-			r.logger.Error(err, "failed writing status")
+			log.Error(err, "failed to update status subresource")
+			return
 		}
+
+		log.Info("successfully reconciled")
 	}()
 
 	// prepare and commit
 	tx, err := r.prepare(ctx, req, jwker)
 	if err != nil {
 		jwker.Status.SynchronizationState = events.FailedPrepare
-		r.reportError(err, "failed prepare jwks")
+		r.reportError(ctx, err, "failed preparing jwker")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
@@ -273,7 +259,7 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	err = r.create(*tx)
 	if err != nil {
 		jwker.Status.SynchronizationState = events.FailedSynchronization
-		r.reportError(err, "failed synchronization")
+		r.reportError(ctx, err, "failed synchronization")
 		return ctrl.Result{
 			RequeueAfter: requeueInterval,
 		}, nil
@@ -283,16 +269,15 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	jwker.Status.SynchronizationHash = hash
 	jwker.Status.SynchronizationSecretName = tx.jwker.Spec.SecretName
 
-	// delete unused secrets from cluster
 	for _, oldSecret := range tx.secretLists.Unused.Items {
 		if oldSecret.GetName() == jwker.Spec.SecretName {
 			continue
 		}
 
-		r.logger.Info(fmt.Sprintf("Deleting unused secret '%s'...", oldSecret.GetName()))
+		log.Info("deleting unused secret...", "secret", oldSecret.GetName())
 		if err := r.Delete(tx.ctx, &oldSecret); err != nil {
 			if !errors.IsNotFound(err) {
-				r.logger.Error(err, "failed deletion")
+				log.Error(err, "failed to delete unused secret", "secret", oldSecret.GetName())
 			}
 		}
 	}
@@ -319,8 +304,8 @@ func (r *JwkerReconciler) shouldUpdateSecrets(jwker jwkerv1.Jwker) bool {
 	return jwker.Spec.SecretName != jwker.Status.SynchronizationSecretName
 }
 
-func (r *JwkerReconciler) reportError(err error, message string) {
-	r.logger.Error(err, message)
+func (r *JwkerReconciler) reportError(ctx context.Context, err error, message string) {
+	ctrl.LoggerFrom(ctx).Error(err, message)
 	jwkermetrics.JwkersProcessingFailedCount.Inc()
 }
 

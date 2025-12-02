@@ -2,36 +2,28 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
-	"strings"
-	"time"
 
-	"github.com/go-logr/zapr"
-	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
-	log "github.com/sirupsen/logrus"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
-	ctrlmetricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-
+	"github.com/go-logr/logr"
 	"github.com/nais/jwker/controllers"
 	"github.com/nais/jwker/pkg/config"
 	jwkermetrics "github.com/nais/jwker/pkg/metric"
+	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
+	ctrlmetricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	// +kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	// Register custom metrics with the global prometheus registry
-
 	metrics.Registry.MustRegister(
 		jwkermetrics.JwkersTotal,
 		jwkermetrics.JwkersProcessedCount,
@@ -40,20 +32,7 @@ func init() {
 		jwkermetrics.JwkersProcessingFailedCount,
 	)
 
-	formatter := log.JSONFormatter{
-		TimestampFormat: time.RFC3339Nano,
-	}
-	log.SetFormatter(&formatter)
-
-	level, err := log.ParseLevel(strings.ToLower(os.Getenv("LOG_LEVEL")))
-	if err != nil {
-		level = log.InfoLevel
-	}
-
-	log.SetLevel(level)
-
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = jwkerv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -62,15 +41,16 @@ func main() {
 	ctx := context.Background()
 	cfg, err := config.New(ctx)
 	if err != nil {
-		log.Fatalf("initializing config: %+v", err)
+		slog.Error("initializing config", "error", err)
+		os.Exit(1)
 	}
 
-	zapLogger, err := setupZapLogger(cfg.LogLevel)
-	if err != nil {
-		log.Fatalf("unable to set up logger: %+v", err)
+	if err := setupLogger(cfg.LogLevel); err != nil {
+		slog.Error("unable to set up logger", "error", err)
+		os.Exit(1)
 	}
 
-	ctrl.SetLogger(zapr.NewLogger(zapLogger))
+	setupLog := slog.Default().With("logger", "setup")
 	setupLog.Info("starting jwker")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -78,44 +58,60 @@ func main() {
 		Metrics: ctrlmetricsserver.Options{
 			BindAddress: cfg.MetricsAddr,
 		},
+		HealthProbeBindAddress: cfg.ProbeAddr,
+		LivenessEndpointName:   "/healthz",
+		ReadinessEndpointName:  "/readyz",
+		LeaderElection:         cfg.LeaderElection,
+		LeaderElectionID:       "722f3604.nais.io",
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error("unable to create manager", "error", err)
 		os.Exit(1)
 	}
-	reconciler := &controllers.JwkerReconciler{
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error("unable to set up health check", "error", err)
+		os.Exit(1)
+	}
+
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error("unable to set up ready check", "error", err)
+		os.Exit(1)
+	}
+
+	if err = (&controllers.JwkerReconciler{
 		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
+		Config:   cfg,
 		Reader:   mgr.GetAPIReader(),
 		Recorder: mgr.GetEventRecorderFor("Jwker"),
 		Scheme:   mgr.GetScheme(),
-		Config:   cfg,
-	}
-
-	if err = reconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Jwker")
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error("unable to create controller", "controller", "jwker", "error", err)
 		os.Exit(1)
 	}
 
-	metrics.Registry.MustRegister()
 	setupLog.Info("starting metrics refresh goroutine")
 	go jwkermetrics.RefreshTotalJwkerClusterMetrics(mgr.GetClient())
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error("problem running manager", "error", err)
 		os.Exit(1)
 	}
 }
 
-func setupZapLogger(logLevel string) (*zap.Logger, error) {
-	loggerConfig := zap.NewProductionConfig()
-	level, err := zap.ParseAtomicLevel(strings.ToLower(logLevel))
-	if err != nil {
-		return nil, err
+func setupLogger(logLevel string) error {
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(logLevel)); err != nil {
+		return fmt.Errorf("parsing log level: %w", err)
 	}
-	loggerConfig.Level = level
-	loggerConfig.EncoderConfig.TimeKey = "timestamp"
-	loggerConfig.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
-	return loggerConfig.Build()
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	})
+
+	slog.SetDefault(slog.New(handler))
+	ctrl.SetLogger(logr.FromSlogHandler(handler))
+
+	return nil
 }

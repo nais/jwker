@@ -2,12 +2,12 @@ package metric
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/nais/jwker/pkg/secret"
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -56,12 +56,14 @@ func RefreshTotalJwkerClusterMetrics(cli client.Client) error {
 
 	t := time.NewTicker(exp)
 	for range t.C {
-		log.Debug("Fetching metrics from cluster")
+		slog.Debug("fetching metrics from cluster")
 		if err = cli.List(ctx, &secretList, mLabels); err != nil {
+			slog.Error("listing jwker secrets", "error", err)
 			return err
 		}
 		JwkerSecretsTotal.Set(float64(len(secretList.Items)))
 		if err = cli.List(ctx, &jwkerList); err != nil {
+			slog.Error("listing jwkers", "error", err)
 			return err
 		}
 		JwkersTotal.Set(float64(len(jwkerList.Items)))

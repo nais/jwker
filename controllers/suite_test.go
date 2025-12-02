@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"github.com/nais/liberator/pkg/crd"
 	"github.com/nais/liberator/pkg/events"
 	"github.com/nais/liberator/pkg/oauth"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -234,7 +234,6 @@ func TestReconciler(t *testing.T) {
 
 	err = (&controllers.JwkerReconciler{
 		Client:   cli,
-		Log:      ctrl.Log.WithName("controllers").WithName("Jwker"),
 		Recorder: mgr.GetEventRecorderFor("jwker"),
 		Scheme:   mgr.GetScheme(),
 		Config:   cfg,
@@ -433,7 +432,7 @@ func getFirstFoundEnvTestBinaryDir() string {
 	basePath := filepath.Join("..", "bin", "k8s")
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		logrus.WithError(err).WithField("path", basePath).Errorf("Failed to read directory; have you run 'make setup-envtest'?")
+		slog.Error("failed to read envtest binary directory; have you run 'make setup-envtest'?", "path", basePath, "error", err)
 		return ""
 	}
 	for _, entry := range entries {
