@@ -274,10 +274,10 @@ func (r *JwkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			continue
 		}
 
-		log.Info("deleting unused secret...", "secret", oldSecret.GetName())
+		log.Info(fmt.Sprintf("deleting unused secret %q...", oldSecret.GetName()))
 		if err := r.Delete(tx.ctx, &oldSecret); err != nil {
 			if !errors.IsNotFound(err) {
-				log.Error(err, "failed to delete unused secret", "secret", oldSecret.GetName())
+				log.Error(err, fmt.Sprintf("failed to delete unused secret %q", oldSecret.GetName()))
 			}
 		}
 	}
