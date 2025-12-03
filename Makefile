@@ -36,7 +36,10 @@ deadcode:
 helm-lint:
 	helm lint --strict ./charts
 
-check: static deadcode vuln
+actions-lint:
+	go tool ratchet lint .github/workflows/*.yaml
+
+check: static deadcode vuln actions-lint
 
 # the JWK is a randomly generated key for testing purposes only
 local: fmt
