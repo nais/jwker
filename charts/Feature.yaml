@@ -25,6 +25,14 @@ values:
     description: Log level for jwker, default is 'info'
     config:
       type: string
+  resources.limits.memory:
+    description: Memory limit for jwker container
+    config:
+      type: string
+  resources.requests.memory:
+    description: Memory request for jwker container
+    config:
+      type: string
   tokendings.instanceUrls:
     description: List of URLs for Tokendings instances.
       Overrides `tokendings.host`.

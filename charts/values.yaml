@@ -18,11 +18,10 @@ nameOverride: "tokenx-jwker"
 
 resources:
   limits:
-    memory: 1Gi
-    cpu: 1000m
+    memory: 4Gi
   requests:
     memory: 256Mi
-    cpu: 200m
+    cpu: 10m
 
 secretName: "jwker-env"
 clusterName: ""
