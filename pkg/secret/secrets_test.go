@@ -92,7 +92,7 @@ func TestCreateSecretSpec(t *testing.T) {
 	})
 }
 
-func JsonAsString(v interface{}) string {
+func JsonAsString(v any) string {
 	j, err := json.MarshalIndent(v, "", " ")
 	if err != nil {
 		fmt.Printf("Error parsing to json: %s", err)

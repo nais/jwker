@@ -64,7 +64,7 @@ func New(ctx context.Context) (*Config, error) {
 	if raw == "" {
 		raw = tokendingsURL
 	}
-	for _, u := range strings.Split(raw, ",") {
+	for u := range strings.SplitSeq(raw, ",") {
 		_, err := url.Parse(strings.TrimSpace(u))
 		if err != nil {
 			return nil, fmt.Errorf("invalid base url for tokendings instance: %w", err)
