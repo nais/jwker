@@ -19,6 +19,8 @@ updates:
       gh-actions:
         patterns:
           - '*'
+    cooldown:
+      default-days: 7
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
