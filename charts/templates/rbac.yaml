@@ -21,13 +21,21 @@ rules:
       - ""
     resources:
       - secrets
-      - events
     verbs:
       - get
       - list
       - watch
       - create
       - delete
+      - update
+  - apiGroups:
+      - ""
+      - "events.k8s.io"
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
       - update
   - apiGroups:
       - ""

@@ -234,7 +234,7 @@ func TestReconciler(t *testing.T) {
 
 	err = (&controllers.JwkerReconciler{
 		Client:   cli,
-		Recorder: mgr.GetEventRecorderFor("jwker"),
+		Recorder: mgr.GetEventRecorder("jwker"),
 		Scheme:   mgr.GetScheme(),
 		Config:   cfg,
 	}).SetupWithManager(mgr)

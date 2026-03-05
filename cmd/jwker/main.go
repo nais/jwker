@@ -83,7 +83,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Config:   cfg,
 		Reader:   mgr.GetAPIReader(),
-		Recorder: mgr.GetEventRecorderFor("Jwker"),
+		Recorder: mgr.GetEventRecorder("Jwker"),
 		Scheme:   mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		log.Error("unable to create controller", "controller", "jwker", "error", err)
