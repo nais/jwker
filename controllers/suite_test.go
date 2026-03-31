@@ -181,10 +181,10 @@ func fixtures(cli client.Client, tokendingsURL string) error {
 			Data: map[string][]byte{
 				secret.TokenXPrivateJWKKey:    keyBytes,
 				secret.TokenXClientIDKey:      []byte("local:default:app1"),
-				secret.TokenXWellKnownURLKey:  []byte(fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsURL)),
+				secret.TokenXWellKnownURLKey:  fmt.Appendf(nil, "%s/.well-known/oauth-authorization-server", tokendingsURL),
 				secret.TokenXIssuerKey:        []byte(tokendingsURL),
-				secret.TokenXJwksURIKey:       []byte(fmt.Sprintf("%s/jwks", tokendingsURL)),
-				secret.TokenXTokenEndpointKey: []byte(fmt.Sprintf("%s/token", tokendingsURL)),
+				secret.TokenXJwksURIKey:       fmt.Appendf(nil, "%s/jwks", tokendingsURL),
+				secret.TokenXTokenEndpointKey: fmt.Appendf(nil, "%s/token", tokendingsURL),
 			},
 		},
 	)
