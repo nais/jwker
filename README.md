@@ -121,12 +121,18 @@ Jwker can be configured using either command-line flags or equivalent environmen
 
 ## Development
 
+### Requirements
+
+- [mise](https://mise.jdx.dev/) - tool version manager and task runner
+
+### Getting started
+
 Start a local Kubernetes cluster, e.g. using [kind](https://kind.sigs.k8s.io/), [minikube](https://minikube.sigs.k8s.io/), or similar.
 
 Install the CRD if you haven't already:
 
 ```shell
-make install-crd
+mise run install:crd
 ```
 
 Start up dependencies:
@@ -138,11 +144,11 @@ docker-compose up -d
 Run the operator:
 
 ```shell
-make local
+mise run local
 ```
 
 Deploy a sample `Jwker`:
 
 ```shell
-make sample
+mise run install:sample
 ```
