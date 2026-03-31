@@ -13,28 +13,16 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/oauth"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ClientId struct {
+type ClientID struct {
 	Name      string
 	Namespace string
 	Cluster   string
 }
 
-func (a *ClientId) String() string {
+func (a ClientID) String() string {
 	return fmt.Sprintf("%s:%s:%s", a.Cluster, a.Namespace, a.Name)
-}
-
-func (a *ClientId) ToFileName() string {
-	return fmt.Sprintf("%s/%s/%s", a.Cluster, a.Namespace, a.Name)
-}
-
-func (a *ClientId) KubeObjectKey() client.ObjectKey {
-	return client.ObjectKey{
-		Name:      a.Name,
-		Namespace: a.Namespace,
-	}
 }
 
 type ClientRegistration struct {
@@ -71,7 +59,7 @@ func NewInstance(baseURL, clientID string, clientJwk *jose.JSONWebKey, metadata 
 	}
 }
 
-func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientId) error {
+func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientID) error {
 	endpoint := fmt.Sprintf("%s/registration/client", t.BaseURL)
 
 	request, err := http.NewRequestWithContext(ctx, "DELETE", fmt.Sprintf("%s/%s", endpoint, url.QueryEscape(appClientId.String())), nil)
@@ -101,7 +89,7 @@ func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientId) error
 	return fmt.Errorf("delete client from tokendings: %s: %s", resp.Status, msg)
 }
 
-func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, appClientId ClientId, jwker v1.Jwker) (*ClientRegistration, error) {
+func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *jose.JSONWebKeySet, appClientId ClientID, jwker v1.Jwker) (*ClientRegistration, error) {
 	key := jose.SigningKey{Algorithm: jose.RS256, Key: jwkerPrivateJwk.Key}
 	signerOpts := jose.SignerOptions{}
 	signerOpts.WithType("JWT")
@@ -131,10 +119,10 @@ func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *
 	}, nil
 }
 
-func (t *Instance) RegisterClient(cr ClientRegistration) error {
+func (t *Instance) RegisterClient(registration *ClientRegistration) error {
 	endpoint := fmt.Sprintf("%s/registration/client", t.BaseURL)
 
-	data, err := json.Marshal(cr)
+	data, err := json.Marshal(registration)
 	if err != nil {
 		return err
 	}
@@ -165,7 +153,7 @@ func (t *Instance) RegisterClient(cr ClientRegistration) error {
 	return nil
 }
 
-func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement, error) {
+func createSoftwareStatement(jwker v1.Jwker, appId ClientID) (*SoftwareStatement, error) {
 	inbound := make([]string, 0)
 	outbound := make([]string, 0)
 	if jwker.Spec.AccessPolicy == nil {
@@ -190,7 +178,7 @@ func createSoftwareStatement(jwker v1.Jwker, appId ClientId) (*SoftwareStatement
 	}, nil
 }
 
-func ensureValidRule(rule *v1.AccessPolicyRule, appId ClientId) {
+func ensureValidRule(rule *v1.AccessPolicyRule, appId ClientID) {
 	if len(rule.Namespace) == 0 {
 		rule.Namespace = appId.Namespace
 	}

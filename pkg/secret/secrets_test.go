@@ -26,7 +26,7 @@ func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
 			Namespace: corev1.NamespaceDefault,
 			Name:      "some-secret",
 		},
-		Data: map[string][]byte{TokenXPrivateJwkKey: j},
+		Data: map[string][]byte{TokenXPrivateJWKKey: j},
 	}, nil
 }
 
@@ -44,7 +44,7 @@ func TestExtractJWK(t *testing.T) {
 }
 
 func TestCreateSecretSpec(t *testing.T) {
-	app := tokendings.ClientId{
+	app := tokendings.ClientID{
 		Name:      "test",
 		Namespace: "test",
 		Cluster:   "test",
@@ -53,8 +53,8 @@ func TestCreateSecretSpec(t *testing.T) {
 	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
-	secretData := PodSecretData{
-		ClientId: app,
+	secretData := Data{
+		ClientID: app,
 		Jwk:      jwk,
 		Tokendings: tokendings.Instance{
 			BaseURL: "https://tokendings.example.com",
@@ -71,11 +71,11 @@ func TestCreateSecretSpec(t *testing.T) {
 	t.Run("should contain runtime variables", func(t *testing.T) {
 		expected, err := json.Marshal(jwk)
 		assert.NoError(t, err)
-		assert.Equal(t, app.String(), actual.StringData[TokenXClientIdKey])
-		assert.Equal(t, string(expected), actual.StringData[TokenXPrivateJwkKey])
-		assert.Equal(t, "https://tokendings.example.com/.well-known/oauth-authorization-server", actual.StringData[TokenXWellKnownUrlKey])
+		assert.Equal(t, app.String(), actual.StringData[TokenXClientIDKey])
+		assert.Equal(t, string(expected), actual.StringData[TokenXPrivateJWKKey])
+		assert.Equal(t, "https://tokendings.example.com/.well-known/oauth-authorization-server", actual.StringData[TokenXWellKnownURLKey])
 		assert.Equal(t, "https://tokendings.example.com", actual.StringData[TokenXIssuerKey])
-		assert.Equal(t, "https://tokendings.example.com/jwks", actual.StringData[TokenXJwksUriKey])
+		assert.Equal(t, "https://tokendings.example.com/jwks", actual.StringData[TokenXJwksURIKey])
 		assert.Equal(t, "https://tokendings.example.com/token", actual.StringData[TokenXTokenEndpointKey])
 	})
 

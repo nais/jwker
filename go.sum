@@ -118,8 +118,8 @@ github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFd
 github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/nais/liberator v0.0.0-20260302095824-148ee733f3a0 h1:cIm4YsSMA1yn78HIkWFp4kGPP2oT93PiSgqDAeXHzy4=
-github.com/nais/liberator v0.0.0-20260302095824-148ee733f3a0/go.mod h1:GWifE3yfOpYLpkIA5Xbyck5iL6XuHyqO6MAsW6cssPY=
+github.com/nais/liberator v0.0.0-20260330122219-f904beae5152 h1:fKb2yRxh0Y6hEu/3uHdTUmoWU+ieQzs9Pj8Wt0MRoe0=
+github.com/nais/liberator v0.0.0-20260330122219-f904beae5152/go.mod h1:bzj/Xzh3GfAB+GA8Ltv6HmM0M9kPGNIdIoHmgzfCoUE=
 github.com/nais/pgrator v0.0.0-20260113113020-3944d387b42d h1:Ciq0quRhHOeeOTWy9WNmLe04uNYhe7l9qIrFTpFC5y0=
 github.com/nais/pgrator v0.0.0-20260113113020-3944d387b42d/go.mod h1:jpksYq94zmmjIIhjOBl+9GpEkTbaeLrrcINPQx9REx4=
 github.com/onsi/ginkgo/v2 v2.27.2 h1:LzwLj0b89qtIy6SSASkzlNvX6WktqurSHwkk2ipF/Ns=

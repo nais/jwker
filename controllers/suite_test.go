@@ -18,6 +18,7 @@ import (
 	"github.com/nais/liberator/pkg/events"
 	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +78,7 @@ func (h *tokendingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func fixtures(cli client.Client) error {
+func fixtures(cli client.Client, tokendingsURL string) error {
 	var err error
 
 	ctx := context.Background()
@@ -126,10 +127,18 @@ func fixtures(cli client.Client) error {
 				},
 				Volumes: []corev1.Volume{
 					{
-						Name: "foo",
+						Name: "secret-previous-in-use",
 						VolumeSource: corev1.VolumeSource{
 							Secret: &corev1.SecretVolumeSource{
 								SecretName: alreadyInUseSecret,
+							},
+						},
+					},
+					{
+						Name: "secret-to-create",
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: secretName,
 							},
 						},
 					},
@@ -165,9 +174,17 @@ func fixtures(cli client.Client) error {
 					"app":                       appName,
 					secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
 				},
+				Annotations: map[string]string{
+					secret.StakaterReloaderAnnotationKey: "true",
+				},
 			},
-			StringData: map[string]string{
-				secret.TokenXPrivateJwkKey: string(keyBytes),
+			Data: map[string][]byte{
+				secret.TokenXPrivateJWKKey:    keyBytes,
+				secret.TokenXClientIDKey:      []byte("local:default:app1"),
+				secret.TokenXWellKnownURLKey:  []byte(fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsURL)),
+				secret.TokenXIssuerKey:        []byte(tokendingsURL),
+				secret.TokenXJwksURIKey:       []byte(fmt.Sprintf("%s/jwks", tokendingsURL)),
+				secret.TokenXTokenEndpointKey: []byte(fmt.Sprintf("%s/token", tokendingsURL)),
 			},
 		},
 	)
@@ -208,11 +225,11 @@ func TestReconciler(t *testing.T) {
 	}
 
 	k8scfg, err := testEnv.Start()
-	assert.NoError(t, err)
-	assert.NotNil(t, k8scfg)
+	require.NoError(t, err)
+	require.NotNil(t, k8scfg)
 
 	err = naisiov1.AddToScheme(scheme.Scheme)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// +kubebuilder:scaffold:scheme
 
@@ -222,12 +239,13 @@ func TestReconciler(t *testing.T) {
 			BindAddress: "0",
 		},
 	})
+	require.NoError(t, err)
 
 	cli = mgr.GetClient()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	tokendingsServer := httptest.NewServer(&tokendingsHandler{})
-	cfg, err := makeConfig(tokendingsServer.URL)
+	tokendings := httptest.NewServer(&tokendingsHandler{})
+	cfg, err := makeConfig(tokendings.URL)
 	if err != nil {
 		log.Fatalf("unable to create tokendings instances: %+v", err)
 	}
@@ -238,10 +256,10 @@ func TestReconciler(t *testing.T) {
 		Scheme:   mgr.GetScheme(),
 		Config:   cfg,
 	}).SetupWithManager(mgr)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// insert data into the cluster
-	err = fixtures(cli)
+	err = fixtures(cli, tokendings.URL)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -259,33 +277,15 @@ func TestReconciler(t *testing.T) {
 
 	// wait for synced secret until timeout
 	currentSecret, err := getSecretWithTimeout(ctx, cli, namespace, secretName)
-	assert.NoError(t, err)
-	assert.NotNil(t, currentSecret)
-
-	assert.Equal(t, map[string]string{
-		secret.StakaterReloaderAnnotationKey: "true",
-	}, currentSecret.GetAnnotations())
-	assert.Equal(t, map[string]string{
-		"app":                       appName,
-		secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
-	}, currentSecret.GetLabels())
-
-	// secret must have data
-	assert.NotEmpty(t, currentSecret.Data[secret.TokenXPrivateJwkKey])
-
-	t.Run("should contain secret data", func(t *testing.T) {
-		assert.NoError(t, err)
-		assert.Equal(t, "local:default:app1", string(currentSecret.Data[secret.TokenXClientIdKey]))
-		assert.Equal(t, fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXWellKnownUrlKey]))
-		assert.Equal(t, tokendingsServer.URL, string(currentSecret.Data[secret.TokenXIssuerKey]))
-		assert.Equal(t, fmt.Sprintf("%s/jwks", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXJwksUriKey]))
-		assert.Equal(t, fmt.Sprintf("%s/token", tokendingsServer.URL), string(currentSecret.Data[secret.TokenXTokenEndpointKey]))
-	})
+	require.NoError(t, err)
+	require.NotNil(t, currentSecret)
+	ensureSecretIsValid(t, currentSecret, tokendings.URL)
 
 	// existing, in-use secret should be preserved
 	previousSecret, err := getSecret(ctx, cli, namespace, alreadyInUseSecret)
-	assert.NoError(t, err)
-	assert.NotNil(t, previousSecret)
+	require.NoError(t, err)
+	require.NotNil(t, previousSecret)
+	ensureSecretIsValid(t, previousSecret, tokendings.URL)
 
 	// expired secret should be deleted
 	_, err = getSecret(ctx, cli, namespace, expiredSecret)
@@ -298,26 +298,58 @@ func TestReconciler(t *testing.T) {
 		Name:      appName,
 	}
 	err = cli.Get(ctx, key, jwker)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.True(t, containsOwnerRef(currentSecret.GetOwnerReferences(), jwker), "secret should contain ownerReference")
 
-	hash, err := jwker.Spec.Hash()
-	assert.NoError(t, err)
-	assert.Equal(t, hash, jwker.Status.SynchronizationHash)
+	assert.Equal(t, jwker.GetGeneration(), jwker.Status.ObservedGeneration)
 	assert.Equal(t, events.RolloutComplete, jwker.Status.SynchronizationState)
 	assert.Equal(t, []string{
 		"jwker.nais.io/finalizer",
 	}, jwker.GetFinalizers())
 
+	// update secret name in jwker spec and verify that a new secret is created
+	err = cli.Get(ctx, key, jwker)
+	require.NoError(t, err)
+	jwker.Spec.SecretName = "new-secret-name"
+	err = cli.Update(ctx, jwker)
+	require.NoError(t, err)
+
+	newSecret, err := getSecretWithTimeout(ctx, cli, namespace, "new-secret-name")
+	require.NoError(t, err)
+	require.NotNil(t, newSecret)
+	ensureSecretIsValid(t, newSecret, tokendings.URL)
+
+	// verify that the previous secret still exists
+	previousSecret, err = getSecret(ctx, cli, namespace, secretName)
+	require.NoError(t, err)
+	require.NotNil(t, previousSecret)
+	ensureSecretIsValid(t, previousSecret, tokendings.URL)
+
 	// remove the jwker resource; usually done when naiserator syncs
 	err = cli.Delete(ctx, jwker)
-	assert.NoError(t, err)
-	assert.NoError(t, waitForDeletedJwker(ctx, cli, namespace, jwker.Name))
+	require.NoError(t, err)
+	require.NoError(t, waitForDeletedJwker(ctx, cli, namespace, jwker.Name))
 
 	cancel()
 	err = testEnv.Stop()
-	assert.NoError(t, err)
+	require.NoError(t, err)
+}
+
+func ensureSecretIsValid(t *testing.T, sec *corev1.Secret, tokendingsURL string) {
+	assert.Equal(t, map[string]string{
+		secret.StakaterReloaderAnnotationKey: "true",
+	}, sec.GetAnnotations())
+	assert.Equal(t, map[string]string{
+		"app":                       appName,
+		secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
+	}, sec.GetLabels())
+	assert.NotEmpty(t, sec.Data[secret.TokenXPrivateJWKKey])
+	assert.Equal(t, "local:default:app1", string(sec.Data[secret.TokenXClientIDKey]))
+	assert.Equal(t, fmt.Sprintf("%s/.well-known/oauth-authorization-server", tokendingsURL), string(sec.Data[secret.TokenXWellKnownURLKey]))
+	assert.Equal(t, tokendingsURL, string(sec.Data[secret.TokenXIssuerKey]))
+	assert.Equal(t, fmt.Sprintf("%s/jwks", tokendingsURL), string(sec.Data[secret.TokenXJwksURIKey]))
+	assert.Equal(t, fmt.Sprintf("%s/token", tokendingsURL), string(sec.Data[secret.TokenXTokenEndpointKey]))
 }
 
 func getSecret(ctx context.Context, cli client.Client, namespace, name string) (*corev1.Secret, error) {

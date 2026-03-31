@@ -14,7 +14,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
-	github.com/nais/liberator v0.0.0-20260302095824-148ee733f3a0
+	github.com/nais/liberator v0.0.0-20260330122219-f904beae5152
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.35.2

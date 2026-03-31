@@ -6,17 +6,18 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/nais/jwker/pkg/tokendings"
+	"github.com/nais/liberator/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	TokenXClientIdKey      = "TOKEN_X_CLIENT_ID"
+	TokenXClientIDKey      = "TOKEN_X_CLIENT_ID"
 	TokenXIssuerKey        = "TOKEN_X_ISSUER"
-	TokenXJwksUriKey       = "TOKEN_X_JWKS_URI"
-	TokenXPrivateJwkKey    = "TOKEN_X_PRIVATE_JWK"
+	TokenXJwksURIKey       = "TOKEN_X_JWKS_URI"
+	TokenXPrivateJWKKey    = "TOKEN_X_PRIVATE_JWK"
 	TokenXTokenEndpointKey = "TOKEN_X_TOKEN_ENDPOINT"
-	TokenXWellKnownUrlKey  = "TOKEN_X_WELL_KNOWN_URL"
+	TokenXWellKnownURLKey  = "TOKEN_X_WELL_KNOWN_URL"
 
 	TokenXSecretLabelKey  = "type"
 	TokenXSecretLabelType = "jwker.nais.io"
@@ -24,36 +25,57 @@ const (
 	StakaterReloaderAnnotationKey = "reloader.stakater.com/match"
 )
 
-type PodSecretData struct {
-	ClientId   tokendings.ClientId
+var ErrNotFound = fmt.Errorf("not found")
+
+type Data struct {
+	ClientID   tokendings.ClientID
 	Jwk        jose.JSONWebKey
 	Tokendings tokendings.Instance
 }
 
-func FirstJWK(jwks jose.JSONWebKeySet) (*jose.JSONWebKey, error) {
-	keysLen := len(jwks.Keys)
-	if keysLen != 1 {
-		return nil, fmt.Errorf("secret has %d keys, expecting exactly 1", keysLen)
-	}
-	return &jwks.Keys[0], nil
-}
-
-func ExtractJWK(sec corev1.Secret) (*jose.JSONWebKey, error) {
+func ExtractJWK(sec corev1.Secret) (jose.JSONWebKey, error) {
 	jwk := &jose.JSONWebKey{}
 
-	jwkBytes, found := sec.Data[TokenXPrivateJwkKey]
+	jwkBytes, found := sec.Data[TokenXPrivateJWKKey]
 	if !found {
-		return nil, fmt.Errorf("failed to find any expected keys in secret '%s'", sec.Name)
+		return jose.JSONWebKey{}, fmt.Errorf("failed to find any expected keys in secret '%s'", sec.Name)
 	}
 
 	if err := json.Unmarshal(jwkBytes, jwk); err != nil {
-		return nil, err
+		return jose.JSONWebKey{}, err
 	}
 
-	return jwk, nil
+	return *jwk, nil
 }
 
-func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, error) {
+func ExtractCurrentJWK(secretName string, secrets kubernetes.SecretLists) (jose.JSONWebKey, error) {
+	allSecrets := append(secrets.Unused.Items, secrets.Used.Items...)
+
+	for _, secret := range allSecrets {
+		if secret.Name == secretName {
+			return ExtractJWK(secret)
+		}
+	}
+
+	return jose.JSONWebKey{}, ErrNotFound
+}
+
+func ExtractPreviousInUseJWKSet(secrets kubernetes.SecretLists) (jose.JSONWebKeySet, error) {
+	previousJwks := jose.JSONWebKeySet{}
+
+	for _, usedSecret := range secrets.Used.Items {
+		key, err := ExtractJWK(usedSecret)
+		if err != nil {
+			return jose.JSONWebKeySet{}, err
+		}
+
+		previousJwks.Keys = append(previousJwks.Keys, key)
+	}
+
+	return previousJwks, nil
+}
+
+func CreateSecretSpec(secretName string, data Data) (*corev1.Secret, error) {
 	jwkJson, err := json.Marshal(data.Jwk)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling private JWK: %w", err)
@@ -71,18 +93,18 @@ func CreateSecretSpec(secretName string, data PodSecretData) (*corev1.Secret, er
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: data.ClientId.Namespace,
-			Labels:    Labels(data.ClientId.Name),
+			Namespace: data.ClientID.Namespace,
+			Labels:    Labels(data.ClientID.Name),
 			Annotations: map[string]string{
 				StakaterReloaderAnnotationKey: "true",
 			},
 		},
 		StringData: map[string]string{
-			TokenXPrivateJwkKey:    string(jwkJson),
-			TokenXClientIdKey:      data.ClientId.String(),
-			TokenXWellKnownUrlKey:  wellKnownURL,
+			TokenXPrivateJWKKey:    string(jwkJson),
+			TokenXClientIDKey:      data.ClientID.String(),
+			TokenXWellKnownURLKey:  wellKnownURL,
 			TokenXIssuerKey:        data.Tokendings.Metadata.Issuer,
-			TokenXJwksUriKey:       data.Tokendings.Metadata.JwksURI,
+			TokenXJwksURIKey:       data.Tokendings.Metadata.JwksURI,
 			TokenXTokenEndpointKey: data.Tokendings.Metadata.TokenEndpoint,
 		},
 		Type: corev1.SecretTypeOpaque,

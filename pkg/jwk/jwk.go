@@ -9,8 +9,16 @@ import (
 )
 
 type KeySet struct {
-	Private jose.JSONWebKeySet
-	Public  jose.JSONWebKeySet
+	PrivateKey jose.JSONWebKey
+	PublicKeys jose.JSONWebKeySet
+}
+
+func (k KeySet) KeyIDs() []string {
+	keyIDs := make([]string, len(k.PublicKeys.Keys))
+	for i, key := range k.PublicKeys.Keys {
+		keyIDs[i] = key.KeyID
+	}
+	return keyIDs
 }
 
 func Parse(json []byte) (*jose.JSONWebKey, error) {
@@ -39,17 +47,23 @@ func Generate() (jose.JSONWebKey, error) {
 	return jwk, nil
 }
 
-func KeySetWithExisting(newjwk jose.JSONWebKey, existingjwks []jose.JSONWebKey) KeySet {
+func KeySetWithExisting(newjwk jose.JSONWebKey, existing jose.JSONWebKeySet) KeySet {
 	return KeySet{
-		Private: jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{
-				newjwk,
-			},
-		},
-		Public: jose.JSONWebKeySet{
-			Keys: publicKeys(append(existingjwks, newjwk)...),
+		PrivateKey: newjwk,
+		PublicKeys: jose.JSONWebKeySet{
+			Keys: publicKeys(append(existing.Keys, newjwk)...),
 		},
 	}
+}
+
+// EnsureKeyInSet appends key to the set if a key with the same KeyID is not already present.
+func EnsureKeyInSet(set *jose.JSONWebKeySet, key jose.JSONWebKey) {
+	for _, existing := range set.Keys {
+		if existing.KeyID == key.KeyID {
+			return
+		}
+	}
+	set.Keys = append(set.Keys, key)
 }
 
 func publicKeys(keys ...jose.JSONWebKey) []jose.JSONWebKey {
