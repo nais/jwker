@@ -17,10 +17,10 @@ require (
 	github.com/nais/liberator v0.0.0-20260302095824-148ee733f3a0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
-	k8s.io/api v0.35.2
-	k8s.io/apimachinery v0.35.2
-	k8s.io/client-go v0.35.2
-	sigs.k8s.io/controller-runtime v0.23.1
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
+	k8s.io/client-go v0.35.3
+	sigs.k8s.io/controller-runtime v0.23.3
 )
 
 require (
