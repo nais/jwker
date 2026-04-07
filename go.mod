@@ -12,7 +12,7 @@ tool (
 )
 
 require (
-	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
 	github.com/nais/liberator v0.0.0-20260330122219-f904beae5152
