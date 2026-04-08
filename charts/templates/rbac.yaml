@@ -18,6 +18,14 @@ rules:
       - delete
       - update
   - apiGroups:
+      - nais.io
+    resources:
+      - jwkers/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
       - ""
     resources:
       - secrets
