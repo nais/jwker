@@ -3,6 +3,7 @@ package secret
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/nais/jwker/pkg/tokendings"
@@ -49,7 +50,7 @@ func ExtractJWK(sec corev1.Secret) (jose.JSONWebKey, error) {
 }
 
 func ExtractCurrentJWK(secretName string, secrets kubernetes.SecretLists) (jose.JSONWebKey, error) {
-	allSecrets := append(secrets.Unused.Items, secrets.Used.Items...)
+	allSecrets := slices.Concat(secrets.Unused.Items, secrets.Used.Items)
 
 	for _, secret := range allSecrets {
 		if secret.Name == secretName {
