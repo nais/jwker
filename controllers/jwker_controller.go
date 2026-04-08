@@ -174,7 +174,7 @@ func (r *JwkerReconciler) prepare(ctx context.Context, req ctrl.Request, jwker j
 
 	if jwker.Spec.SecretName == jwker.Status.SynchronizationSecretName && currentJWK.Key != nil {
 		log.Info("secret name unchanged; will reuse existing JWK", "keyID", currentJWK.KeyID, "secretName", jwker.Spec.SecretName)
-		keyset := jwk.KeySetWithExisting(currentJWK, previousInUseJWKSet)
+		keyset := jwk.NewRotatedKeySet(currentJWK, previousInUseJWKSet)
 		return &transaction{ctx, req, keyset, secrets}, nil
 	}
 
@@ -194,8 +194,12 @@ func (r *JwkerReconciler) generateNewKeySet(ctx context.Context, req ctrl.Reques
 		return nil, err
 	}
 
-	keyset := jwk.KeySetWithExisting(newJWK, previousInUseJWKSet)
-	return &transaction{ctx, req, keyset, secrets}, nil
+	return &transaction{
+		ctx:         ctx,
+		req:         req,
+		jwks:        jwk.NewRotatedKeySet(newJWK, previousInUseJWKSet),
+		secretLists: secrets,
+	}, nil
 }
 
 func (r *JwkerReconciler) synchronize(tx transaction, jwker jwkerv1.Jwker) error {

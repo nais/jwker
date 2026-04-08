@@ -47,11 +47,16 @@ func Generate() (jose.JSONWebKey, error) {
 	return jwk, nil
 }
 
-func KeySetWithExisting(newjwk jose.JSONWebKey, existing jose.JSONWebKeySet) KeySet {
+// NewRotatedKeySet creates a KeySet where privateKey is the active signing key.
+// The public keys include privateKey's public component plus all keys from
+// previousKeys, deduplicated by KeyID.
+func NewRotatedKeySet(privateKey jose.JSONWebKey, previousKeys jose.JSONWebKeySet) KeySet {
+	merged := mergeKeys(privateKey, previousKeys.Keys)
+
 	return KeySet{
-		PrivateKey: newjwk,
+		PrivateKey: privateKey,
 		PublicKeys: jose.JSONWebKeySet{
-			Keys: publicKeys(append(existing.Keys, newjwk)...),
+			Keys: publicKeys(merged...),
 		},
 	}
 }
@@ -64,6 +69,18 @@ func EnsureKeyInSet(set *jose.JSONWebKeySet, key jose.JSONWebKey) {
 		}
 	}
 	set.Keys = append(set.Keys, key)
+}
+
+// mergeKeys returns a slice starting with key, followed by all keys
+// from others that do not share key's KeyID.
+func mergeKeys(key jose.JSONWebKey, others []jose.JSONWebKey) []jose.JSONWebKey {
+	merged := []jose.JSONWebKey{key}
+	for _, k := range others {
+		if k.KeyID != key.KeyID {
+			merged = append(merged, k)
+		}
+	}
+	return merged
 }
 
 func publicKeys(keys ...jose.JSONWebKey) []jose.JSONWebKey {

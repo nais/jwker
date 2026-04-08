@@ -149,7 +149,7 @@ func TestMakeClientRegistration(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	keyset := jwk.KeySetWithExisting(appkey, jose.JSONWebKeySet{})
+	keyset := jwk.NewRotatedKeySet(appkey, jose.JSONWebKeySet{})
 
 	output, err := MakeClientRegistration(&signkey, &keyset.PublicKeys, ClientID{
 		Name:      "myapplication",
