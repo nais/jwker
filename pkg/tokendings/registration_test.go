@@ -81,7 +81,7 @@ func TestDeleteClient(t *testing.T) {
 
 	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL))
 
-	err = td.DeleteClient(context.Background(), ClientId{
+	err = td.DeleteClient(context.Background(), ClientID{
 		Name:      "app1",
 		Namespace: "team1",
 		Cluster:   "cluster1",
@@ -90,7 +90,7 @@ func TestDeleteClient(t *testing.T) {
 }
 
 func TestRegisterClient(t *testing.T) {
-	app := ClientId{
+	app := ClientID{
 		Name:      "app1",
 		Namespace: "team1",
 		Cluster:   "cluster1",
@@ -126,7 +126,7 @@ func TestRegisterClient(t *testing.T) {
 	defer server.Close()
 
 	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL))
-	err = td.RegisterClient(ClientRegistration{
+	err = td.RegisterClient(&ClientRegistration{
 		ClientName: app.String(),
 		Jwks: jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{
@@ -149,15 +149,13 @@ func TestMakeClientRegistration(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	appkeys := jwk.KeySetWithExisting(appkey, []jose.JSONWebKey{})
+	keyset := jwk.KeySetWithExisting(appkey, jose.JSONWebKeySet{})
 
-	clientid := ClientId{
+	output, err := MakeClientRegistration(&signkey, &keyset.PublicKeys, ClientID{
 		Name:      "myapplication",
 		Namespace: "mynamespace",
 		Cluster:   "mycluster",
-	}
-
-	output, err := MakeClientRegistration(&signkey, &appkeys.Public, clientid, test.input)
+	}, test.input)
 
 	assert.NoError(t, err)
 	assert.Equal(t, test.clientName, output.ClientName)
