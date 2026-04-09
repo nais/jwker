@@ -85,5 +85,5 @@ spec:
             sources:
               - serviceAccountToken:
                   path: token
-                  expirationSeconds: 120
+                  expirationSeconds: 600
                   audience: tokendings
