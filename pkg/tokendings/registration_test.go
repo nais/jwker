@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	jwkerv1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -70,6 +72,13 @@ func TestDeleteClient(t *testing.T) {
 	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
 
+	raw, err := ClientAssertion(&jwk, "jwker", "http://endpoint/registration/client")
+	require.NoError(t, err)
+
+	AuthTokenPath = os.TempDir() + "/auth-token"
+	err = os.WriteFile(AuthTokenPath, []byte(raw), 0o600)
+	require.NoError(t, err)
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/registration/client/cluster1:team1:app1", r.URL.Path)
 		assert.Equal(t, "DELETE", r.Method)
@@ -98,6 +107,13 @@ func TestRegisterClient(t *testing.T) {
 
 	jwk, err := jwk.Generate()
 	assert.NoError(t, err)
+
+	raw, err := ClientAssertion(&jwk, "jwker", "http://endpoint/registration/client")
+	require.NoError(t, err)
+
+	AuthTokenPath = os.TempDir() + "/auth-token"
+	err = os.WriteFile(AuthTokenPath, []byte(raw), 0o600)
+	require.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/registration/client", r.URL.Path)

@@ -16,7 +16,7 @@ import (
 	"github.com/nais/liberator/pkg/oauth"
 )
 
-const tokenPath = "/var/run/secrets/kubernetes.io/tokendings/token"
+var AuthTokenPath = "/var/run/secrets/kubernetes.io/tokendings/token"
 
 type ClientID struct {
 	Name      string
@@ -70,7 +70,7 @@ func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientID) error
 		return err
 	}
 
-	accessToken, err := os.ReadFile(tokenPath)
+	accessToken, err := os.ReadFile(AuthTokenPath)
 	if err != nil {
 		return fmt.Errorf("unable to read token for invoking tokendings: %w", err)
 	}
@@ -136,7 +136,7 @@ func (t *Instance) RegisterClient(registration *ClientRegistration) error {
 	}
 	request.Header.Add("Content-Type", "application/json")
 
-	accessToken, err := os.ReadFile(tokenPath)
+	accessToken, err := os.ReadFile(AuthTokenPath)
 	if err != nil {
 		return fmt.Errorf("unable to read token for invoking tokendings: %w", err)
 	}
