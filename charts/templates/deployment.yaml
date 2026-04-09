@@ -69,6 +69,8 @@ spec:
           volumeMounts:
             - mountPath: /tmp
               name: writable-tmp
+            - mountPath: /var/run/secrets/kubernetes.io/tokendings
+              name: tokendings
       securityContext:
         fsGroup: 1069
         fsGroupChangePolicy: OnRootMismatch
@@ -78,3 +80,10 @@ spec:
       volumes:
         - emptyDir: {}
           name: writable-tmp
+        - name: tokendings
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 120
+                  audience: tokendings

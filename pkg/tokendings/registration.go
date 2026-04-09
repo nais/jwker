@@ -8,12 +8,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/oauth"
 )
+
+const tokenPath = "/var/run/secrets/kubernetes.io/tokendings/token"
 
 type ClientID struct {
 	Name      string
@@ -67,9 +70,9 @@ func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientID) error
 		return err
 	}
 
-	accessToken, err := ClientAssertion(t.ClientJwk, t.ClientID, endpoint)
+	accessToken, err := os.ReadFile(tokenPath)
 	if err != nil {
-		return fmt.Errorf("unable to create token for invoking tokendings: %w", err)
+		return fmt.Errorf("unable to read token for invoking tokendings: %w", err)
 	}
 
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -126,16 +129,18 @@ func (t *Instance) RegisterClient(registration *ClientRegistration) error {
 	if err != nil {
 		return err
 	}
+
 	request, err := http.NewRequest("POST", endpoint, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	request.Header.Add("Content-Type", "application/json")
 
-	accessToken, err := ClientAssertion(t.ClientJwk, t.ClientID, endpoint)
+	accessToken, err := os.ReadFile(tokenPath)
 	if err != nil {
-		return fmt.Errorf("unable to create token for invoking tokendings: %w", err)
+		return fmt.Errorf("unable to read token for invoking tokendings: %w", err)
 	}
+
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	client := http.Client{}
