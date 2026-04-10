@@ -68,7 +68,7 @@ sequenceDiagram
       jwker ->> jwker: re-use private key from existing secret
     end
 
-    jwker ->> jwker: create client assertion for<br/>authenticating with tokendings
+    jwker ->> jwker: authenticate with tokendings<br/>(service account token or client assertion)
     jwker ->> tokendings: POST public keys (JWKS)<br/>and access policies to<br/>`/registration/client`
     note over tokendings: JWKS contains all currently used public keys
 
@@ -87,7 +87,7 @@ sequenceDiagram
 3. The controller then checks if the `spec.secretName` has changed:
    1. If the secret name has changed, it creates a new private key for the application.
    2. If the secret name is unchanged, it reuses the private key from the existing secret.
-4. The operator creates a client assertion for authenticating with Tokendings.
+4. The operator authenticates with Tokendings using either a Kubernetes service account token (if `--auth-token-path` is set) or a self-signed client assertion.
 5. The application's public keys (JWKS) and access policies are registered with Tokendings via the `/registration/client` endpoint.
    1. The JWKS contains all currently used public keys to ensure key rotation works properly.
    2. Each application is registered with Tokendings using a unique identifier in the form of `clustername:namespace:application`
@@ -115,9 +115,20 @@ Jwker can be configured using either command-line flags or equivalent environmen
 | `--client-jwk-json`           | `JWKER_PRIVATE_JWK`    | string | JSON string containing the private key in JWK format.                      |
 | `--tokendings-base-url`       | `TOKENDINGS_URL`       | string | The base URL to Tokendings.                                                |
 | `--tokendings-instances`      | `TOKENDINGS_INSTANCES` | string | Comma separated list of base URLs to multiple Tokendings instances.        |
+| `--auth-token-path`           | `AUTH_TOKEN_PATH`      | string | Path to a service account token file for Tokendings authentication. If empty, falls back to client assertion. |
 | `--max-concurrent-reconciles` |                        | int    | Maximum number of concurrent reconciles for the controller. (default `20`) |
 | `--metrics-addr`              |                        | string | The address the metric endpoint binds to. (default `:8181`)                |
 | `--log-level`                 |                        | string | Log level. (default `info`)                                                |
+
+### Authentication with Tokendings
+
+Jwker supports two modes for authenticating with Tokendings:
+
+1. **Client assertion (default):** Jwker signs a JWT using its private key (`--client-jwk-json`). This is the original behavior and requires no additional configuration.
+
+2. **Kubernetes service account token:** Jwker reads a projected service account token from a file specified by `--auth-token-path`. This uses the Kubernetes-native identity instead of a self-signed JWT.
+
+When deploying via the Helm chart, set `useServiceAccountAuth: true` to enable the service account token mode. The chart will automatically configure the projected volume, volume mount, and `AUTH_TOKEN_PATH` environment variable.
 
 ## Development
 
