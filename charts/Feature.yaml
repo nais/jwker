@@ -49,6 +49,11 @@ values:
       template: '"{{ subdomain . "tokenx" }}"'
     config:
       type: string
+  useServiceAccountAuth:
+    description: Use a Kubernetes service account token for Tokendings authentication instead of client assertion with private key.
+    required: false
+    config:
+      type: boolean
   networkPolicy.apiServerCIDR:
     computed:
       template: '"{{ .Env.apiserver_endpoint }}/32"'

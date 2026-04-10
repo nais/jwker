@@ -27,6 +27,7 @@ secretName: "jwker-env"
 clusterName: ""
 logLevel: "info"
 privateJwk: ""
+useServiceAccountAuth: true
 tokendings:
   host: ""
   instanceUrls: []

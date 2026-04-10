@@ -75,8 +75,8 @@ func TestDeleteClient(t *testing.T) {
 	raw, err := ClientAssertion(&jwk, "jwker", "http://endpoint/registration/client")
 	require.NoError(t, err)
 
-	AuthTokenPath = os.TempDir() + "/auth-token"
-	err = os.WriteFile(AuthTokenPath, []byte(raw), 0o600)
+	authTokenPath := os.TempDir() + "/auth-token"
+	err = os.WriteFile(authTokenPath, []byte(raw), 0o600)
 	require.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +88,7 @@ func TestDeleteClient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL))
+	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL), authTokenPath)
 
 	err = td.DeleteClient(context.Background(), ClientID{
 		Name:      "app1",
@@ -111,8 +111,8 @@ func TestRegisterClient(t *testing.T) {
 	raw, err := ClientAssertion(&jwk, "jwker", "http://endpoint/registration/client")
 	require.NoError(t, err)
 
-	AuthTokenPath = os.TempDir() + "/auth-token"
-	err = os.WriteFile(AuthTokenPath, []byte(raw), 0o600)
+	authTokenPath := os.TempDir() + "/auth-token"
+	err = os.WriteFile(authTokenPath, []byte(raw), 0o600)
 	require.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,13 +141,46 @@ func TestRegisterClient(t *testing.T) {
 	}))
 	defer server.Close()
 
-	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL))
+	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL), authTokenPath)
 	err = td.RegisterClient(&ClientRegistration{
 		ClientName: app.String(),
 		Jwks: jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{
 				jwk,
 			},
+		},
+		SoftwareStatement: "signedstatement",
+	})
+
+	assert.NoError(t, err)
+}
+
+func TestRegisterClient_ClientAssertionFallback(t *testing.T) {
+	app := ClientID{
+		Name:      "app1",
+		Namespace: "team1",
+		Cluster:   "cluster1",
+	}
+
+	jwk, err := jwk.Generate()
+	assert.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/registration/client", r.URL.Path)
+		assert.Equal(t, "POST", r.Method)
+
+		verifyToken(t, r, jwk)
+
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	// Empty AuthTokenPath → should fall back to ClientAssertion
+	td := NewInstance(server.URL, "jwker", &jwk, metadata(server.URL), "")
+	err = td.RegisterClient(&ClientRegistration{
+		ClientName: app.String(),
+		Jwks: jose.JSONWebKeySet{
+			Keys: []jose.JSONWebKey{jwk},
 		},
 		SoftwareStatement: "signedstatement",
 	})

@@ -9,14 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	v1 "github.com/nais/liberator/pkg/apis/nais.io/v1"
 	"github.com/nais/liberator/pkg/oauth"
 )
-
-var AuthTokenPath = "/var/run/secrets/kubernetes.io/tokendings/token"
 
 type ClientID struct {
 	Name      string
@@ -47,19 +46,72 @@ type SoftwareStatement struct {
 }
 
 type Instance struct {
-	BaseURL   string
-	ClientID  string
-	ClientJwk *jose.JSONWebKey
-	Metadata  *oauth.MetadataOAuth
+	BaseURL       string
+	ClientID      string
+	ClientJwk     *jose.JSONWebKey
+	Metadata      *oauth.MetadataOAuth
+	AuthTokenPath string // optional: path to service account token file
 }
 
-func NewInstance(baseURL, clientID string, clientJwk *jose.JSONWebKey, metadata *oauth.MetadataOAuth) Instance {
+func NewInstance(baseURL, clientID string, clientJwk *jose.JSONWebKey, metadata *oauth.MetadataOAuth, authTokenPath string) Instance {
 	return Instance{
-		BaseURL:   baseURL,
-		ClientID:  clientID,
-		ClientJwk: clientJwk,
-		Metadata:  metadata,
+		BaseURL:       baseURL,
+		ClientID:      clientID,
+		ClientJwk:     clientJwk,
+		Metadata:      metadata,
+		AuthTokenPath: authTokenPath,
 	}
+}
+
+func (t *Instance) getAccessToken(endpoint string) (string, error) {
+	if t.AuthTokenPath != "" {
+		token, err := os.ReadFile(t.AuthTokenPath)
+		if err != nil {
+			return "", fmt.Errorf("unable to read token from %s: %w", t.AuthTokenPath, err)
+		}
+		accessToken := strings.TrimSpace(string(token))
+		if accessToken == "" {
+			return "", fmt.Errorf("token file %s is empty", t.AuthTokenPath)
+		}
+		return accessToken, nil
+	}
+	return ClientAssertion(t.ClientJwk, t.ClientID, endpoint)
+}
+
+func (t *Instance) RegisterClient(registration *ClientRegistration) error {
+	endpoint := fmt.Sprintf("%s/registration/client", t.BaseURL)
+
+	data, err := json.Marshal(registration)
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest("POST", endpoint, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	request.Header.Add("Content-Type", "application/json")
+
+	accessToken, err := t.getAccessToken(endpoint)
+	if err != nil {
+		return fmt.Errorf("unable to get token for invoking tokendings: %w", err)
+	}
+
+	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	client := http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		response, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unable to register application with tokendings: %s: %s", resp.Status, response)
+	}
+
+	return nil
 }
 
 func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientID) error {
@@ -70,9 +122,9 @@ func (t *Instance) DeleteClient(ctx context.Context, appClientId ClientID) error
 		return err
 	}
 
-	accessToken, err := os.ReadFile(AuthTokenPath)
+	accessToken, err := t.getAccessToken(endpoint)
 	if err != nil {
-		return fmt.Errorf("unable to read token for invoking tokendings: %w", err)
+		return fmt.Errorf("unable to get token for invoking tokendings: %w", err)
 	}
 
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -120,42 +172,6 @@ func MakeClientRegistration(jwkerPrivateJwk *jose.JSONWebKey, clientPublicJwks *
 		Jwks:              *clientPublicJwks,
 		SoftwareStatement: rawJWT,
 	}, nil
-}
-
-func (t *Instance) RegisterClient(registration *ClientRegistration) error {
-	endpoint := fmt.Sprintf("%s/registration/client", t.BaseURL)
-
-	data, err := json.Marshal(registration)
-	if err != nil {
-		return err
-	}
-
-	request, err := http.NewRequest("POST", endpoint, bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-	request.Header.Add("Content-Type", "application/json")
-
-	accessToken, err := os.ReadFile(AuthTokenPath)
-	if err != nil {
-		return fmt.Errorf("unable to read token for invoking tokendings: %w", err)
-	}
-
-	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
-	client := http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		response, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unable to register application with tokendings: %s: %s", resp.Status, response)
-	}
-
-	return nil
 }
 
 func createSoftwareStatement(jwker v1.Jwker, appId ClientID) (*SoftwareStatement, error) {

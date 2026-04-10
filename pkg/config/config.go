@@ -17,6 +17,7 @@ import (
 )
 
 type Config struct {
+	AuthTokenPath           string
 	ClientID                string
 	ClientJwk               *jose.JSONWebKey
 	ClusterName             string
@@ -34,6 +35,7 @@ func New(ctx context.Context) (*Config, error) {
 	var instanceString string
 	var tokendingsURL string
 
+	flag.StringVar(&cfg.AuthTokenPath, "auth-token-path", os.Getenv("AUTH_TOKEN_PATH"), "Path to service account token file for Tokendings authentication. If empty, falls back to client assertion with private key.")
 	flag.StringVar(&clientJwkJson, "client-jwk-json", os.Getenv("JWKER_PRIVATE_JWK"), "json with private JWK credential")
 	flag.StringVar(&cfg.ClientID, "client-id", os.Getenv("JWKER_CLIENT_ID"), "Client ID of Jwker at Auth Provider.")
 	flag.StringVar(&cfg.ClusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "nais cluster")
@@ -84,7 +86,7 @@ func New(ctx context.Context) (*Config, error) {
 			return nil, fmt.Errorf("resolving metadata for tokendings instance %s: %w", u, err)
 		}
 
-		instances = append(instances, tokendings.NewInstance(u, cfg.ClientID, cfg.ClientJwk, metadata))
+		instances = append(instances, tokendings.NewInstance(u, cfg.ClientID, cfg.ClientJwk, metadata, cfg.AuthTokenPath))
 	}
 
 	if len(instances) == 0 {
