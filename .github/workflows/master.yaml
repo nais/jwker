@@ -66,4 +66,4 @@ jobs:
           chart: ${{ env.FEATURE_REPOSITORY }}/tokenx-${{ env.NAME }}
           version: ${{ needs.build_and_push.outputs.version }}
           target: |
-            {"kind":"tenant"}
+            {"userWorkloads":"true"}
