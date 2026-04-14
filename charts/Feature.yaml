@@ -51,7 +51,6 @@ values:
       type: string
   useServiceAccountAuth:
     description: Use a Kubernetes service account token for Tokendings authentication instead of client assertion with private key.
-    required: false
     config:
       type: boolean
   networkPolicy.apiServerCIDR:
