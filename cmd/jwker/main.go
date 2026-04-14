@@ -52,6 +52,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Info(fmt.Sprintf("resolved %d Tokendings instances:", len(cfg.TokendingsInstances)))
+	for i, instance := range cfg.TokendingsInstances {
+		log.Info(fmt.Sprintf("instance %d: baseURL=%q, clientID=%q", i+1, instance.BaseURL, instance.ClientID))
+	}
+	if cfg.AuthTokenPath != "" {
+		log.Info(fmt.Sprintf("using service account token for Tokendings authentication from %q", cfg.AuthTokenPath))
+	}
+
 	log.Info("starting jwker")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,

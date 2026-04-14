@@ -29,6 +29,10 @@ spec:
         - env:
             - name: "LEADER_ELECTION"
               value: "true"
+            {{- if .Values.useServiceAccountAuth }}
+            - name: "AUTH_TOKEN_PATH"
+              value: "/var/run/secrets/kubernetes.io/tokendings/token"
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.secretName }}
@@ -69,6 +73,10 @@ spec:
           volumeMounts:
             - mountPath: /tmp
               name: writable-tmp
+            {{- if .Values.useServiceAccountAuth }}
+            - mountPath: /var/run/secrets/kubernetes.io/tokendings
+              name: tokendings
+            {{- end }}
       securityContext:
         fsGroup: 1069
         fsGroupChangePolicy: OnRootMismatch
@@ -78,3 +86,12 @@ spec:
       volumes:
         - emptyDir: {}
           name: writable-tmp
+        {{- if .Values.useServiceAccountAuth }}
+        - name: tokendings
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 600
+                  audience: tokendings
+        {{- end }}

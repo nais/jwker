@@ -417,16 +417,28 @@ func makeConfig(tokendingsURL string) (*config.Config, error) {
 		return nil, err
 	}
 
+	raw, err := tokendings.ClientAssertion(&jwk, "client1", "http://endpoint/registration/client")
+	if err != nil {
+		return nil, err
+	}
+
+	authTokenPath := os.TempDir() + "/auth-token"
+	err = os.WriteFile(authTokenPath, []byte(raw), 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("unable to write token for invoking tokendings: %w", err)
+	}
+
 	return &config.Config{
-		ClientID:    "jwker",
-		ClientJwk:   &jwk,
-		ClusterName: "local",
+		ClientID:      "jwker",
+		ClientJwk:     &jwk,
+		ClusterName:   "local",
+		AuthTokenPath: authTokenPath,
 		TokendingsInstances: []tokendings.Instance{
 			tokendings.NewInstance(tokendingsURL, "jwker", &jwk, &oauth.MetadataOAuth{
 				Issuer:        tokendingsURL,
 				JwksURI:       tokendingsURL + "/jwks",
 				TokenEndpoint: tokendingsURL + "/token",
-			}),
+			}, authTokenPath),
 		},
 	}, nil
 }
