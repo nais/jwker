@@ -1,19 +1,16 @@
-# Build the manager binary
-FROM golang:1.26 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26 AS builder
+ENV CGO_ENABLED=0
+WORKDIR /src
 
-COPY . /workspace
-WORKDIR /workspace
-
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
+COPY go.mod go.sum ./
 RUN go mod download
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -installsuffix cgo -o jwker cmd/jwker/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static-debian12:nonroot
-WORKDIR /
-COPY --from=builder /workspace/jwker /jwker
+COPY . .
+ARG TARGETOS
+ARG TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -o bin/jwker ./cmd/jwker
 
-CMD ["/jwker"]
+FROM cgr.dev/chainguard/static:latest
+WORKDIR /app
+COPY --from=builder /src/bin/jwker /app/jwker
+ENTRYPOINT ["/app/jwker"]
