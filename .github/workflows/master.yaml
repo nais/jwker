@@ -10,15 +10,19 @@ env:
   FEATURE_REPOSITORY: oci://europe-north1-docker.pkg.dev/nais-io/nais/feature
 jobs:
   test:
+    name: ${{ matrix.task }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [check, test]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # ratchet:actions/setup-go@v6
         with:
           go-version-file: "go.mod"
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # ratchet:jdx/mise-action@v4
-      - run: mise run check
-      - run: mise run test
+      - run: mise run ${{ matrix.task }}
   build_and_push:
     if: github.ref == 'refs/heads/master'
     outputs:
@@ -60,23 +64,20 @@ jobs:
     runs-on: fasit-deploy
     permissions:
       id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: '{"kind":"tenant","tenant":"dev-nais"}'
+            skip-ci: false
+          - target: '{"kind":"onprem","tenant":"nav"}'
+            skip-ci: true
+          - target: '{"kind":"tenant","tenant":"nav"}'
+            skip-ci: false
     steps:
       - uses: nais/fasit-deploy@6e5772c21e82cb101537dd5e3ce78d70e2ae6402 # ratchet:nais/fasit-deploy@v3
         with:
           chart: ${{ env.FEATURE_REPOSITORY }}/tokenx-${{ env.NAME }}
           version: ${{ needs.build_and_push.outputs.version }}
-          target: |
-            {"kind":"tenant","tenant":"dev-nais"}
-      - uses: nais/fasit-deploy@6e5772c21e82cb101537dd5e3ce78d70e2ae6402 # ratchet:nais/fasit-deploy@v3
-        with:
-          chart: ${{ env.FEATURE_REPOSITORY }}/tokenx-${{ env.NAME }}
-          version: ${{ needs.build_and_push.outputs.version }}
-          skip-ci: true
-          target: |
-            {"kind":"onprem","tenant":"nav"}
-      - uses: nais/fasit-deploy@6e5772c21e82cb101537dd5e3ce78d70e2ae6402 # ratchet:nais/fasit-deploy@v3
-        with:
-          chart: ${{ env.FEATURE_REPOSITORY }}/tokenx-${{ env.NAME }}
-          version: ${{ needs.build_and_push.outputs.version }}
-          target: |
-            {"kind":"tenant","tenant":"nav"}
+          skip-ci: ${{ matrix.skip-ci }}
+          target: ${{ matrix.target }}
