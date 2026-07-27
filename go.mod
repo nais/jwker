@@ -1,6 +1,6 @@
 module github.com/nais/jwker
 
-go 1.26.3
+go 1.26.5
 
 tool (
 	github.com/sethvargo/ratchet
