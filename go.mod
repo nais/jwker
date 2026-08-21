@@ -1,6 +1,6 @@
 module github.com/nais/jwker
 
-go 1.26.5
+go 1.26.7
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4
