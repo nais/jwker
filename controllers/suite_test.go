@@ -86,14 +86,10 @@ func fixtures(cli client.Client, tokendingsURL string) error {
 	err = cli.Create(
 		ctx,
 		&naisiov1.Jwker{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Jwker",
-				APIVersion: "nais.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      appName,
-				Namespace: namespace,
-			},
+			Kind:       "Jwker",
+			APIVersion: "nais.io/v1",
+			Name:       appName,
+			Namespace:  namespace,
 			Spec: naisiov1.JwkerSpec{
 				SecretName:   secretName,
 				AccessPolicy: &naisiov1.AccessPolicy{},
@@ -107,16 +103,12 @@ func fixtures(cli client.Client, tokendingsURL string) error {
 	err = cli.Create(
 		ctx,
 		&corev1.Pod{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Pod",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      appName,
-				Namespace: namespace,
-				Labels: map[string]string{
-					"app": appName,
-				},
+			Kind:       "Pod",
+			APIVersion: "v1",
+			Name:       appName,
+			Namespace:  namespace,
+			Labels: map[string]string{
+				"app": appName,
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
@@ -128,18 +120,14 @@ func fixtures(cli client.Client, tokendingsURL string) error {
 				Volumes: []corev1.Volume{
 					{
 						Name: "secret-previous-in-use",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: alreadyInUseSecret,
-							},
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: alreadyInUseSecret,
 						},
 					},
 					{
 						Name: "secret-to-create",
-						VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{
-								SecretName: secretName,
-							},
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: secretName,
 						},
 					},
 				},
@@ -163,20 +151,16 @@ func fixtures(cli client.Client, tokendingsURL string) error {
 	err = cli.Create(
 		ctx,
 		&corev1.Secret{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Secret",
-				APIVersion: "v1",
+			Kind:       "Secret",
+			APIVersion: "v1",
+			Name:       alreadyInUseSecret,
+			Namespace:  namespace,
+			Labels: map[string]string{
+				"app":                       appName,
+				secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
 			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      alreadyInUseSecret,
-				Namespace: namespace,
-				Labels: map[string]string{
-					"app":                       appName,
-					secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
-				},
-				Annotations: map[string]string{
-					secret.StakaterReloaderAnnotationKey: "true",
-				},
+			Annotations: map[string]string{
+				secret.StakaterReloaderAnnotationKey: "true",
 			},
 			Data: map[string][]byte{
 				secret.TokenXPrivateJWKKey:    keyBytes,
@@ -195,17 +179,13 @@ func fixtures(cli client.Client, tokendingsURL string) error {
 	err = cli.Create(
 		ctx,
 		&corev1.Secret{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Secret",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      expiredSecret,
-				Namespace: namespace,
-				Labels: map[string]string{
-					"app":                       appName,
-					secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
-				},
+			Kind:       "Secret",
+			APIVersion: "v1",
+			Name:       expiredSecret,
+			Namespace:  namespace,
+			Labels: map[string]string{
+				"app":                       appName,
+				secret.TokenXSecretLabelKey: secret.TokenXSecretLabelType,
 			},
 		},
 	)

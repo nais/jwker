@@ -9,7 +9,6 @@ import (
 	"github.com/nais/jwker/pkg/tokendings"
 	"github.com/nais/liberator/pkg/kubernetes"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -88,17 +87,13 @@ func CreateSecretSpec(secretName string, data Data) (*corev1.Secret, error) {
 	}
 
 	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: data.ClientID.Namespace,
-			Labels:    Labels(data.ClientID.Name),
-			Annotations: map[string]string{
-				StakaterReloaderAnnotationKey: "true",
-			},
+		Kind:       "Secret",
+		APIVersion: "v1",
+		Name:       secretName,
+		Namespace:  data.ClientID.Namespace,
+		Labels:     Labels(data.ClientID.Name),
+		Annotations: map[string]string{
+			StakaterReloaderAnnotationKey: "true",
 		},
 		StringData: map[string]string{
 			TokenXPrivateJWKKey:    string(jwkJson),

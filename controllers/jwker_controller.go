@@ -226,10 +226,10 @@ func (r *JwkerReconciler) synchronize(tx transaction, jwker jwkerv1.Jwker) error
 		return fmt.Errorf("creating secret spec: %w", err)
 	}
 
-	target := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+	target := &corev1.Secret{
 		Name:      secretName,
 		Namespace: tx.req.Namespace,
-	}}
+	}
 	res, err := controllerutil.CreateOrUpdate(tx.ctx, r.Client, target, func() error {
 		target.SetAnnotations(secretSpec.GetAnnotations())
 		target.SetLabels(secretSpec.GetLabels())

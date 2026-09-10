@@ -10,7 +10,6 @@ import (
 	"github.com/nais/liberator/pkg/oauth"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/nais/jwker/pkg/jwk"
 	"github.com/nais/jwker/pkg/tokendings"
@@ -22,11 +21,9 @@ func GetAsSecret(jwk jose.JSONWebKey) (corev1.Secret, error) {
 		panic(err)
 	}
 	return corev1.Secret{
-		ObjectMeta: meta_v1.ObjectMeta{
-			Namespace: corev1.NamespaceDefault,
-			Name:      "some-secret",
-		},
-		Data: map[string][]byte{TokenXPrivateJWKKey: j},
+		Namespace: corev1.NamespaceDefault,
+		Name:      "some-secret",
+		Data:      map[string][]byte{TokenXPrivateJWKKey: j},
 	}, nil
 }
 

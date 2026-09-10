@@ -42,22 +42,16 @@ var test = clientRegistrationTest{
 				Inbound: &jwkerv1.AccessPolicyInbound{
 					Rules: []jwkerv1.AccessPolicyInboundRule{
 						{
-							AccessPolicyRule: jwkerv1.AccessPolicyRule{
-								Application: "otherapplication",
-								Namespace:   "othernamespace",
-								Cluster:     "mycluster",
-							},
+							Application: "otherapplication",
+							Namespace:   "othernamespace",
+							Cluster:     "mycluster",
 						},
 						{
-							AccessPolicyRule: jwkerv1.AccessPolicyRule{
-								Application: "otherapplicationinsamecluster",
-								Namespace:   "othernamespace",
-							},
+							Application: "otherapplicationinsamecluster",
+							Namespace:   "othernamespace",
 						},
 						{
-							AccessPolicyRule: jwkerv1.AccessPolicyRule{
-								Application: "otherapplicationinsamenamespace",
-							},
+							Application: "otherapplicationinsamenamespace",
 						},
 					},
 				},
