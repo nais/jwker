@@ -1,5 +1,6 @@
 dependencies:
   - allOf:
+      - fqdn-policy-crds
       - nais-crds
       - reloader
       # - tokenx-tokendings # This doesn't work for on-premises
